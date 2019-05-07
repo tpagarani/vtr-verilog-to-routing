@@ -998,6 +998,7 @@ struct t_router_opts {
 
     e_heap_type router_heap;
     bool exit_after_first_routing_iteration;
+    bool disable_check_route;
 };
 
 struct t_analysis_opts {
