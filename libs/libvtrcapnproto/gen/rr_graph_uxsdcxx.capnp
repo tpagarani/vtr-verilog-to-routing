@@ -81,6 +81,7 @@ struct Timing {
 	cout @2 :Float32;
 	r @3 :Float32;
 	tdel @4 :Float32;
+	penaltyCost @5 :Float32;
 }
 
 struct Sizing {
