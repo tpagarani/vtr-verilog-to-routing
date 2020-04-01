@@ -23,6 +23,9 @@ class MetadataBind {
         : is_node_(false)
         , is_edge_(false)
         , ignore_(false)
+        , inode_(OPEN)
+        , sink_node_(OPEN)
+        , switch_id_(OPEN)
         , strings_(strings)
         , name_(empty)
         , value_(empty) {}
@@ -1380,7 +1383,7 @@ class RrGraphSerializer final : public uxsd::RrGraphBase<RrGraphContextTypes> {
         return tile->width;
     }
     inline size_t num_block_type_pin_class(const t_physical_tile_type*& tile) final {
-        return tile->num_class;
+        return (int)tile->class_inf.size();
     }
     inline const std::pair<const t_physical_tile_type*, const t_class*> get_block_type_pin_class(int n, const t_physical_tile_type*& tile) final {
         return std::make_pair(tile, &tile->class_inf[n]);
@@ -1436,7 +1439,7 @@ class RrGraphSerializer final : public uxsd::RrGraphBase<RrGraphContextTypes> {
     }
     inline void preallocate_block_type_pin_class(std::pair<const t_physical_tile_type*, int>& context, size_t size) final {
         const t_physical_tile_type* tile = context.first;
-        if (tile->num_class != (ssize_t)size) {
+        if ((int)tile->class_inf.size() != (ssize_t)size) {
             report_error("Architecture file does not match block type");
         }
     }
@@ -1446,7 +1449,7 @@ class RrGraphSerializer final : public uxsd::RrGraphBase<RrGraphContextTypes> {
         int& num_classes = context.second;
 
         // Count number of pin classes
-        if (num_classes >= tile->num_class) {
+        if (num_classes >= (int)tile->class_inf.size()) {
             report_error("Architecture file does not match block type");
         }
         const t_class* class_inf = &context.first->class_inf[num_classes++];
@@ -1461,7 +1464,7 @@ class RrGraphSerializer final : public uxsd::RrGraphBase<RrGraphContextTypes> {
     inline void finish_block_types_block_type(std::pair<const t_physical_tile_type*, int>& context) final {
         const t_physical_tile_type* tile = context.first;
         int num_classes = context.second;
-        if (tile->num_class != num_classes) {
+        if ((int)tile->class_inf.size() != num_classes) {
             report_error("Architecture file does not match block type");
         }
     }

@@ -62,6 +62,7 @@
 #include "check_route.h"
 #include "constant_nets.h"
 #include "atom_netlist_utils.h"
+#include "cluster.h"
 
 #include "pack_report.h"
 
@@ -442,7 +443,10 @@ void vpr_create_device_grid(const t_vpr_setup& vpr_setup, const t_arch& Arch) {
         if (device_ctx.grid.num_instances(&type) != 0) {
             float util = 0.;
             VTR_LOG("\tPhysical Tile %s:\n", type.name);
-            for (auto logical_block : type.equivalent_sites) {
+
+            auto equivalent_sites = get_equivalent_sites_set(&type);
+
+            for (auto logical_block : equivalent_sites) {
                 util = float(num_type_instances[logical_block]) / device_ctx.grid.num_instances(&type);
                 VTR_LOG("\tBlock Utilization: %.2f Logical Block: %s\n", util, logical_block->name);
             }
@@ -495,6 +499,10 @@ bool vpr_pack_flow(t_vpr_setup& vpr_setup, const t_arch& arch) {
 
         /* Output the netlist stats to console. */
         printClusteredNetlistStats();
+
+        // print the total number of used physical blocks for each
+        // physical block type after finishing the packing stage
+        print_pb_type_count(g_vpr_ctx.clustering().clb_nlist);
     }
 
     return status;

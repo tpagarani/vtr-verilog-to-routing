@@ -41,6 +41,8 @@
 #include "vtr_flat_map.h"
 #include "vtr_cache.h"
 #include "vtr_string_view.h"
+#include "vtr_dynamic_bitset.h"
+#include "rr_graph_fwd.h"
 
 /*******************************************************************************
  * Global data types and constants
@@ -214,6 +216,33 @@ class t_pack_high_fanout_thresholds {
 
 /* Type used to express rr_node edge index. */
 typedef uint16_t t_edge_size;
+
+//An iterator that dereferences to an edge index
+//
+//Used inconjunction with vtr::Range to return ranges of edge indices
+class edge_idx_iterator : public std::iterator<std::bidirectional_iterator_tag, t_edge_size> {
+  public:
+    edge_idx_iterator(value_type init)
+        : value_(init) {}
+    iterator operator++() {
+        value_ += 1;
+        return *this;
+    }
+    iterator operator--() {
+        value_ -= 1;
+        return *this;
+    }
+    reference operator*() { return value_; }
+    pointer operator->() { return &value_; }
+
+    friend bool operator==(const edge_idx_iterator lhs, const edge_idx_iterator rhs) { return lhs.value_ == rhs.value_; }
+    friend bool operator!=(const edge_idx_iterator lhs, const edge_idx_iterator rhs) { return !(lhs == rhs); }
+
+  private:
+    value_type value_;
+};
+
+typedef vtr::Range<edge_idx_iterator> edge_idx_range;
 
 /* these are defined later, but need to declare here because it is used */
 class t_rr_node;
@@ -467,26 +496,26 @@ struct t_bb {
 // z: z-offset
 struct t_pl_offset {
     t_pl_offset() = default;
-    t_pl_offset(int xoffset, int yoffset, int zoffset)
+    t_pl_offset(int xoffset, int yoffset, int sub_tile_offset)
         : x(xoffset)
         , y(yoffset)
-        , z(zoffset) {}
+        , sub_tile(sub_tile_offset) {}
 
     int x = 0;
     int y = 0;
-    int z = 0;
+    int sub_tile = 0;
 
     t_pl_offset& operator+=(const t_pl_offset& rhs) {
         x += rhs.x;
         y += rhs.y;
-        z += rhs.z;
+        sub_tile += rhs.sub_tile;
         return *this;
     }
 
     t_pl_offset& operator-=(const t_pl_offset& rhs) {
         x -= rhs.x;
         y -= rhs.y;
-        z -= rhs.z;
+        sub_tile -= rhs.sub_tile;
         return *this;
     }
 
@@ -501,18 +530,18 @@ struct t_pl_offset {
     }
 
     friend t_pl_offset operator-(const t_pl_offset& other) {
-        return t_pl_offset(-other.x, -other.y, -other.z);
+        return t_pl_offset(-other.x, -other.y, -other.sub_tile);
     }
     friend t_pl_offset operator+(const t_pl_offset& other) {
-        return t_pl_offset(+other.x, +other.y, +other.z);
+        return t_pl_offset(+other.x, +other.y, +other.sub_tile);
     }
 
     friend bool operator<(const t_pl_offset& lhs, const t_pl_offset& rhs) {
-        return std::tie(lhs.x, lhs.y, lhs.z) < std::tie(rhs.x, rhs.y, rhs.z);
+        return std::tie(lhs.x, lhs.y, lhs.sub_tile) < std::tie(rhs.x, rhs.y, rhs.sub_tile);
     }
 
     friend bool operator==(const t_pl_offset& lhs, const t_pl_offset& rhs) {
-        return std::tie(lhs.x, lhs.y, lhs.z) == std::tie(rhs.x, rhs.y, rhs.z);
+        return std::tie(lhs.x, lhs.y, lhs.sub_tile) == std::tie(rhs.x, rhs.y, rhs.sub_tile);
     }
 
     friend bool operator!=(const t_pl_offset& lhs, const t_pl_offset& rhs) {
@@ -526,7 +555,7 @@ struct hash<t_pl_offset> {
     std::size_t operator()(const t_pl_offset& v) const noexcept {
         std::size_t seed = std::hash<int>{}(v.x);
         vtr::hash_combine(seed, v.y);
-        vtr::hash_combine(seed, v.z);
+        vtr::hash_combine(seed, v.sub_tile);
         return seed;
     }
 };
@@ -542,26 +571,26 @@ struct hash<t_pl_offset> {
 //offset between t_pl_loc.
 struct t_pl_loc {
     t_pl_loc() = default;
-    t_pl_loc(int xloc, int yloc, int zloc)
+    t_pl_loc(int xloc, int yloc, int sub_tile_loc)
         : x(xloc)
         , y(yloc)
-        , z(zloc) {}
+        , sub_tile(sub_tile_loc) {}
 
     int x = OPEN;
     int y = OPEN;
-    int z = OPEN;
+    int sub_tile = OPEN;
 
     t_pl_loc& operator+=(const t_pl_offset& rhs) {
         x += rhs.x;
         y += rhs.y;
-        z += rhs.z;
+        sub_tile += rhs.sub_tile;
         return *this;
     }
 
     t_pl_loc& operator-=(const t_pl_offset& rhs) {
         x -= rhs.x;
         y -= rhs.y;
-        z -= rhs.z;
+        sub_tile -= rhs.sub_tile;
         return *this;
     }
 
@@ -582,15 +611,15 @@ struct t_pl_loc {
     }
 
     friend t_pl_offset operator-(const t_pl_loc& lhs, const t_pl_loc& rhs) {
-        return t_pl_offset(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z);
+        return t_pl_offset(lhs.x - rhs.x, lhs.y - rhs.y, lhs.sub_tile - rhs.sub_tile);
     }
 
     friend bool operator<(const t_pl_loc& lhs, const t_pl_loc& rhs) {
-        return std::tie(lhs.x, lhs.y, lhs.z) < std::tie(rhs.x, rhs.y, rhs.z);
+        return std::tie(lhs.x, lhs.y, lhs.sub_tile) < std::tie(rhs.x, rhs.y, rhs.sub_tile);
     }
 
     friend bool operator==(const t_pl_loc& lhs, const t_pl_loc& rhs) {
-        return std::tie(lhs.x, lhs.y, lhs.z) == std::tie(rhs.x, rhs.y, rhs.z);
+        return std::tie(lhs.x, lhs.y, lhs.sub_tile) == std::tie(rhs.x, rhs.y, rhs.sub_tile);
     }
 
     friend bool operator!=(const t_pl_loc& lhs, const t_pl_loc& rhs) {
@@ -604,7 +633,7 @@ struct hash<t_pl_loc> {
     std::size_t operator()(const t_pl_loc& v) const noexcept {
         std::size_t seed = std::hash<int>{}(v.x);
         vtr::hash_combine(seed, v.y);
-        vtr::hash_combine(seed, v.z);
+        vtr::hash_combine(seed, v.sub_tile);
         return seed;
     }
 };
@@ -942,8 +971,6 @@ struct t_router_opts {
     enum e_clock_modeling clock_modeling; //How clock pins and nets should be handled
     bool two_stage_clock_routing;         //How clock nets on dedicated networks should be routed
     int high_fanout_threshold;
-
-    e_heap_type router_heap;
     int router_debug_net;
     int router_debug_sink_rr;
     int router_debug_iteration;
@@ -958,6 +985,8 @@ struct t_router_opts {
 
     std::string write_router_lookahead;
     std::string read_router_lookahead;
+
+    e_heap_type router_heap;
     bool disable_check_route;
     bool quick_check_route;
 };
@@ -1203,7 +1232,7 @@ struct t_trace {
  * occ:        The current occupancy of the associated rr node              */
 struct t_rr_node_route_inf {
     int prev_node;
-    t_edge_size prev_edge;
+    RREdgeId prev_edge;
 
     float pres_cost;
     float acc_cost;
@@ -1223,9 +1252,39 @@ struct t_rr_node_route_inf {
 };
 
 //Information about the current status of a particular net as pertains to routing
-struct t_net_routing_status {
-    bool is_routed = false; //Whether the net has been legally routed
-    bool is_fixed = false;  //Whether the net is fixed (i.e. not to be re-routed)
+class t_net_routing_status {
+  public:
+    void clear() {
+        is_routed_.clear();
+        is_fixed_.clear();
+    }
+
+    void resize(size_t number_nets) {
+        is_routed_.resize(number_nets);
+        is_routed_.fill(false);
+        is_fixed_.resize(number_nets);
+        is_fixed_.fill(false);
+    }
+    void set_is_routed(ClusterNetId net, bool is_routed) {
+        is_routed_.set(index(net), is_routed);
+    }
+    bool is_routed(ClusterNetId net) const {
+        return is_routed_.get(index(net));
+    }
+    void set_is_fixed(ClusterNetId net, bool is_fixed) {
+        is_fixed_.set(index(net), is_fixed);
+    }
+    bool is_fixed(ClusterNetId net) const {
+        return is_fixed_.get(index(net));
+    }
+
+  private:
+    ClusterNetId index(ClusterNetId net) const {
+        VTR_ASSERT_SAFE(net != ClusterNetId::INVALID());
+        return net;
+    }
+    vtr::dynamic_bitset<ClusterNetId> is_routed_; //Whether the net has been legally routed
+    vtr::dynamic_bitset<ClusterNetId> is_fixed_;  //Whether the net is fixed (i.e. not to be re-routed)
 };
 
 struct t_node_edge {

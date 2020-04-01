@@ -1,6 +1,7 @@
 #include "clock_connection_builders.h"
 
 #include "globals.h"
+#include "arch_util.h"
 #include "rr_graph2.h"
 
 #include "vtr_assert.h"
@@ -98,6 +99,20 @@ int RoutingToClockConnection::create_virtual_clock_network_sink_node(
     rr_nodes.emplace_back();
     auto node_index = rr_nodes.size() - 1;
 
+    //Determine the a valid PTC
+    std::vector<int> nodes_at_loc;
+    get_rr_node_indices(device_ctx.rr_node_indices,
+                        x, y,
+                        SINK,
+                        &nodes_at_loc);
+
+    int max_ptc = 0;
+    for (int inode : nodes_at_loc) {
+        max_ptc = std::max<int>(max_ptc, device_ctx.rr_nodes[inode].ptc_num());
+    }
+    int ptc = max_ptc + 1;
+
+    rr_nodes[node_index].set_ptc_num(ptc);
     rr_nodes[node_index].set_coordinates(x, y, x, y);
     rr_nodes[node_index].set_capacity(1);
     rr_nodes[node_index].set_cost_index(SINK_COST_INDEX);
@@ -105,6 +120,8 @@ int RoutingToClockConnection::create_virtual_clock_network_sink_node(
     float R = 0.;
     float C = 0.;
     rr_nodes[node_index].set_rc_index(find_create_rr_rc_data(R, C));
+
+    add_to_rr_node_indices(device_ctx.rr_node_indices, rr_nodes, node_index);
 
     return node_index;
 }
@@ -248,7 +265,8 @@ void ClockToPinsConnection::create_switches(const ClockRRGraphBuilder& clock_gra
 
             // Ignore grid locations that do not have blocks
             bool has_pb_type = false;
-            for (auto logical_block : type->equivalent_sites) {
+            auto equivalent_sites = get_equivalent_sites_set(type);
+            for (auto logical_block : equivalent_sites) {
                 if (logical_block->pb_type) {
                     has_pb_type = true;
                     break;
