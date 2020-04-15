@@ -153,7 +153,7 @@
     <tile name="io" area="0">
       <sub_tile name="io" capacity="8">
         <equivalent_sites>
-          <site pb_type="io"/>
+          <site pb_type="io" pin_mapping="direct"/>
         </equivalent_sites>
         <input name="outpad" num_pins="1"/>
         <output name="inpad" num_pins="1"/>
@@ -170,7 +170,7 @@
     <tile name="clk_control" area="0">
       <sub_tile name="clk_control">
         <equivalent_sites>
-          <site pb_type="clk_control"/>
+          <site pb_type="clk_control" pin_mapping="direct"/>
         </equivalent_sites>
         <input name="in" num_pins="2"/>
         <output name="out" num_pins="1"/>
@@ -181,7 +181,7 @@
     <tile name="clb" area="53894">
       <sub_tile name="clb">
         <equivalent_sites>
-          <site pb_type="clb"/>
+          <site pb_type="clb" pin_mapping="direct"/>
         </equivalent_sites>
         <input name="I" num_pins="40" equivalent="full"/>
         <output name="O" num_pins="20" equivalent="none"/>
@@ -193,7 +193,7 @@
     <tile name="mult_36" height="4" area="396000">
       <sub_tile name="mult_36">
         <equivalent_sites>
-          <site pb_type="mult_36"/>
+          <site pb_type="mult_36" pin_mapping="direct"/>
         </equivalent_sites>
         <input name="a" num_pins="36"/>
         <input name="b" num_pins="36"/>
@@ -205,7 +205,7 @@
     <tile name="memory" height="6" area="548000">
       <sub_tile name="memory">
         <equivalent_sites>
-          <site pb_type="memory"/>
+          <site pb_type="memory" pin_mapping="direct"/>
         </equivalent_sites>
         <input name="addr1" num_pins="15"/>
         <input name="addr2" num_pins="15"/>
@@ -339,7 +339,7 @@
       <input name="in" num_pins="2"/>
       <output name="out" num_pins="1"/>
       <mode name="clkbuf">
-        <pb_type name="clkbuf" blif_model="clkbuf" num_pb="1">
+        <pb_type name="clkbuf" blif_model=".subckt clkbuf" num_pb="1">
           <clock name="in" num_pins="1"/>
           <output name="out" num_pins="1"/>
           <delay_constant max="10e-12" in_port="clkbuf.in" out_port="clkbuf.out"/>
@@ -350,7 +350,7 @@
         </interconnect>
       </mode>
       <mode name="clkbufce">
-        <pb_type name="clkbufce" blif_model="clkbufce" num_pb="1">
+        <pb_type name="clkbufce" blif_model=".subckt clkbufce" num_pb="1">
           <clock name="in" num_pins="1"/>
           <input name="enable" num_pins="1"/>
           <output name="out" num_pins="1"/>

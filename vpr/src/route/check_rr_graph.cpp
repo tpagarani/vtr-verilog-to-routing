@@ -306,8 +306,8 @@ void check_rr_node(int inode, enum e_route_type route_type, const DeviceContext&
         case SOURCE:
         case SINK:
             if (type == nullptr) {
-                VPR_ERROR(VPR_ERROR_ROUTE,
-                          "in check_rr_node: node %d (type %d) is at an illegal clb location (%d, %d).\n", inode, rr_type, xlow, ylow);
+                VPR_FATAL_ERROR(VPR_ERROR_ROUTE,
+                                "in check_rr_node: node %d (type %d) is at an illegal clb location (%d, %d).\n", inode, rr_type, xlow, ylow);
             }
             if (xlow != (xhigh - type->width + 1) || ylow != (yhigh - type->height + 1)) {
                 VPR_FATAL_ERROR(VPR_ERROR_ROUTE,
@@ -317,8 +317,8 @@ void check_rr_node(int inode, enum e_route_type route_type, const DeviceContext&
         case IPIN:
         case OPIN:
             if (type == nullptr) {
-                VPR_ERROR(VPR_ERROR_ROUTE,
-                          "in check_rr_node: node %d (type %d) is at an illegal clb location (%d, %d).\n", inode, rr_type, xlow, ylow);
+                VPR_FATAL_ERROR(VPR_ERROR_ROUTE,
+                                "in check_rr_node: node %d (type %d) is at an illegal clb location (%d, %d).\n", inode, rr_type, xlow, ylow);
             }
             if (xlow != xhigh || ylow != yhigh) {
                 VPR_FATAL_ERROR(VPR_ERROR_ROUTE,

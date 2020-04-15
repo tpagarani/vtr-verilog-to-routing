@@ -11,9 +11,9 @@ from copy import deepcopy
 
 DEFAULT_TARGETS_TO_BUILD=["all"]
 
-DEFAULT_GNU_COMPILER_VERSIONS=["9", "8", "7", "6", "5", "4.9"]
+DEFAULT_GNU_COMPILER_VERSIONS=["9", "8", "7", "6", "5"]
 DEFAULT_MINGW_COMPILER_VERSIONS=["5"]
-DEFAULT_CLANG_COMPILER_VERSIONS=["3.8", "3.6", "3.9", "6", "8"]
+DEFAULT_CLANG_COMPILER_VERSIONS=[]#["3.8", "3.6", "3.9", "6", "8"]
 
 DEFAULT_BUILD_CONFIGS = ["release", "debug", "release_pgo"]
 DEFAULT_EASYGL_CONFIGS = ["ON", "OFF"]
@@ -31,6 +31,9 @@ ERROR_WARNING_REGEXES = [
 SUPPRESSION_ERROR_WARNING_REGEXES = [
         #We compile some .c files as C++, so we don't worry about these warnings from clang
         re.compile(r".*clang:.*warning:.*treating.*c.*as.*c\+\+.*"),
+
+        #Don't worry about unused include directories
+        re.compile(r".*clang:.*warning:.*argument.*unused.*during.*compilation:.*'(-I|-isystem)"),
     ]
 
 def parse_args():

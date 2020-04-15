@@ -245,8 +245,6 @@ struct ParseBaseCost {
             conv_value.set_value(DEMAND_ONLY_NORMALIZED_LENGTH);
         else if (str == "demand_only")
             conv_value.set_value(DEMAND_ONLY);
-        else if (str == "delay_normalized_length_bounded")
-            conv_value.set_value(DELAY_NORMALIZED_LENGTH_BOUNDED);
         else {
             std::stringstream msg;
             msg << "Invalid conversion from '" << str << "' to e_router_algorithm (expected one of: " << argparse::join(default_choices(), ", ") << ")";
@@ -267,8 +265,6 @@ struct ParseBaseCost {
             conv_value.set_value("delay_normalized_length_frequency");
         else if (val == DEMAND_ONLY_NORMALIZED_LENGTH)
             conv_value.set_value("demand_only_normalized_length");
-        else if (val == DELAY_NORMALIZED_LENGTH_BOUNDED)
-            conv_value.set_value("delay_normalized_length_bounded");
         else {
             VTR_ASSERT(val == DEMAND_ONLY);
             conv_value.set_value("demand_only");
@@ -277,7 +273,38 @@ struct ParseBaseCost {
     }
 
     std::vector<std::string> default_choices() {
-        return {"demand_only", "demand_only_normalized_length", "delay_normalized", "delay_normalized_length", "delay_normalized_length_bounded", "delay_normalized_frequency", "delay_normalized_length_frequency"};
+        return {"demand_only", "demand_only_normalized_length", "delay_normalized", "delay_normalized_length", "delay_normalized_frequency", "delay_normalized_length_frequency"};
+    }
+};
+
+struct ParsePlaceDeltaDelayAlgorithm {
+    ConvertedValue<e_place_delta_delay_algorithm> from_str(std::string str) {
+        ConvertedValue<e_place_delta_delay_algorithm> conv_value;
+        if (str == "astar")
+            conv_value.set_value(e_place_delta_delay_algorithm::ASTAR_ROUTE);
+        else if (str == "dijkstra")
+            conv_value.set_value(e_place_delta_delay_algorithm::DIJKSTRA_EXPANSION);
+        else {
+            std::stringstream msg;
+            msg << "Invalid conversion from '" << str << "' to e_place_delta_delay_algorithm (expected one of: " << argparse::join(default_choices(), ", ") << ")";
+            conv_value.set_error(msg.str());
+        }
+        return conv_value;
+    }
+
+    ConvertedValue<std::string> to_str(e_place_delta_delay_algorithm val) {
+        ConvertedValue<std::string> conv_value;
+        if (val == e_place_delta_delay_algorithm::ASTAR_ROUTE)
+            conv_value.set_value("astar");
+        else {
+            VTR_ASSERT(val == e_place_delta_delay_algorithm::DIJKSTRA_EXPANSION);
+            conv_value.set_value("dijkstra");
+        }
+        return conv_value;
+    }
+
+    std::vector<std::string> default_choices() {
+        return {"astar", "dijkstra"};
     }
 };
 
@@ -661,8 +688,6 @@ struct ParseRouterLookahead {
             conv_value.set_value(e_router_lookahead::CLASSIC);
         else if (str == "map")
             conv_value.set_value(e_router_lookahead::MAP);
-        else if (str == "connection_box_map")
-            conv_value.set_value(e_router_lookahead::CONNECTION_BOX_MAP);
         else {
             std::stringstream msg;
             msg << "Invalid conversion from '"
@@ -676,22 +701,17 @@ struct ParseRouterLookahead {
 
     ConvertedValue<std::string> to_str(e_router_lookahead val) {
         ConvertedValue<std::string> conv_value;
-        if (val == e_router_lookahead::CLASSIC) {
+        if (val == e_router_lookahead::CLASSIC)
             conv_value.set_value("classic");
-        } else if (val == e_router_lookahead::MAP) {
+        else {
+            VTR_ASSERT(val == e_router_lookahead::MAP);
             conv_value.set_value("map");
-        } else if (val == e_router_lookahead::CONNECTION_BOX_MAP) {
-            conv_value.set_value("connection_box_map");
-        } else {
-            std::stringstream msg;
-            msg << "Unrecognized e_router_lookahead";
-            conv_value.set_error(msg.str());
         }
         return conv_value;
     }
 
     std::vector<std::string> default_choices() {
-        return {"classic", "map", "connection_box_map"};
+        return {"classic", "map"};
     }
 };
 
@@ -834,6 +854,37 @@ struct ParseRouterHeap {
     }
 };
 
+struct ParsePlaceEfforScaling {
+    ConvertedValue<e_place_effort_scaling> from_str(std::string str) {
+        ConvertedValue<e_place_effort_scaling> conv_value;
+        if (str == "circuit")
+            conv_value.set_value(e_place_effort_scaling::CIRCUIT);
+        else if (str == "device_circuit")
+            conv_value.set_value(e_place_effort_scaling::DEVICE_CIRCUIT);
+        else {
+            std::stringstream msg;
+            msg << "Invalid conversion from '" << str << "' to e_place_effort_scaling (expected one of: " << argparse::join(default_choices(), ", ") << ")";
+            conv_value.set_error(msg.str());
+        }
+        return conv_value;
+    }
+
+    ConvertedValue<std::string> to_str(e_place_effort_scaling val) {
+        ConvertedValue<std::string> conv_value;
+        if (val == e_place_effort_scaling::CIRCUIT)
+            conv_value.set_value("circuit");
+        else {
+            VTR_ASSERT(val == e_place_effort_scaling::DEVICE_CIRCUIT);
+            conv_value.set_value("device_circuit");
+        }
+        return conv_value;
+    }
+
+    std::vector<std::string> default_choices() {
+        return {"circuit", "device_circuit"};
+    }
+};
+
 argparse::ArgumentParser create_arg_parser(std::string prog_name, t_options& args) {
     std::string description =
         "Implements the specified circuit onto the target FPGA architecture"
@@ -924,6 +975,65 @@ argparse::ArgumentParser create_arg_parser(std::string prog_name, t_options& arg
     gfx_grp.add_argument<bool, ParseOnOff>(args.save_graphics, "--save_graphics")
         .help("Save all graphical contents to PDF files")
         .default_value("off");
+
+    gfx_grp.add_argument(args.graphics_commands, "--graphics_commands")
+        .help(
+            "A set of semi-colon seperated graphics commands.\n"
+            "   Commands:\n"
+            "      * save_graphics <file>\n"
+            "           Saves graphics to the specified file (.png/.pdf/\n"
+            "           .svg). If <file> contains '{i}', it will be\n"
+            "           replaced with an integer which increments\n"
+            "           each time graphics is invoked.\n"
+            "      * set_macros <int>\n"
+            "           Sets the placement macro drawing state\n"
+            "      * set_nets <int>\n"
+            "           Sets the net drawing state\n"
+            "      * set_cpd <int>\n"
+            "           Sets the criticla path delay drawing state\n"
+            "      * set_routing_util <int>\n"
+            "           Sets the routing utilization drawing state\n"
+            "      * set_clip_routing_util <int>\n"
+            "           Sets whether routing utilization values are\n"
+            "           clipped to [0., 1.]. Useful when a consistent\n"
+            "           scale is needed across images\n"
+            "      * set_draw_block_outlines <int>\n"
+            "           Sets whether blocks have an outline drawn around\n"
+            "           them\n"
+            "      * set_draw_block_text <int>\n"
+            "           Sets whether blocks have label text drawn on them\n"
+            "      * set_draw_block_internals <int>\n"
+            "           Sets the level to which block internals are drawn\n"
+            "      * set_draw_net_max_fanout <int>\n"
+            "           Sets the maximum fanout for nets to be drawn (if\n"
+            "           fanout is beyond this value the net will not be\n"
+            "           drawn)\n"
+            "      * set_congestion <int>\n"
+            "           Sets the routing congestion drawing state\n"
+            "      * exit <int>\n"
+            "           Exits VPR with specified exit code\n"
+            "\n"
+            "   Example:\n"
+            "     'save_graphics place.png; \\\n"
+            "      set_nets 1; save_graphics nets1.png;\\\n"
+            "      set_nets 2; save_graphics nets2.png; set_nets 0;\\\n"
+            "      set_cpd 1; save_graphics cpd1.png; \\\n"
+            "      set_cpd 3; save_graphics cpd3.png; set_cpd 0; \\\n"
+            "      set_routing_util 5; save_graphics routing_util5.png; \\\n"
+            "      set_routing_util 0; \\\n"
+            "      set_congestion 1; save_graphics congestion1.png;'\n"
+            "\n"
+            "   The above toggles various graphics settings (e.g. drawing\n"
+            "   nets, drawing critical path) and then saves the results to\n"
+            "   .png files.\n"
+            "\n"
+            "   Note that drawing state is reset to its previous state after\n"
+            "   these commands are invoked.\n"
+            "\n"
+            "   Like the interactive graphics --disp option, the --auto\n"
+            "   option controls how often the commands specified with\n"
+            "   this option are invoked.\n")
+        .default_value("");
 
     auto& gen_grp = parser.add_argument_group("general options");
 
@@ -1330,9 +1440,32 @@ argparse::ArgumentParser create_arg_parser(std::string prog_name, t_options& arg
         .help("Displays delay statistics even if placement is not timing driven")
         .show_in(argparse::ShowIn::HELP_ONLY);
 
+    place_grp.add_argument<e_place_delta_delay_algorithm, ParsePlaceDeltaDelayAlgorithm>(
+                 args.place_delta_delay_matrix_calculation_method,
+                 "--place_delta_delay_matrix_calculation_method")
+        .help(
+            "What algorithm should be used to compute the place delta matrix.\n"
+            "\n"
+            " * astar : Find delta delays between OPIN's and IPIN's using\n"
+            "           the router with the current --astar_fac.\n"
+            " * dijkstra : Use Dijkstra's algorithm to find all shortest paths \n"
+            "              from sampled OPIN's to all IPIN's.\n")
+        .default_value("astar")
+        .show_in(argparse::ShowIn::HELP_ONLY);
+
     place_grp.add_argument(args.PlaceInnerNum, "--inner_num")
         .help("Controls number of moves per temperature: inner_num * num_blocks ^ (4/3)")
         .default_value("1.0")
+        .show_in(argparse::ShowIn::HELP_ONLY);
+
+    place_grp.add_argument<e_place_effort_scaling, ParsePlaceEfforScaling>(args.place_effort_scaling, "--place_effort_scaling")
+        .help(
+            "Controls how the number of placer moves level scales with circuit\n"
+            " and device size:\n"
+            "  * circuit: proportional to circuit size (num_blocks ^ 4/3)\n"
+            "  * device_circuit: proportional to device and circuit size\n"
+            "                    (grid_size ^ 2/3 * num_blocks ^ 2/3)\n")
+        .default_value("circuit")
         .show_in(argparse::ShowIn::HELP_ONLY);
 
     place_grp.add_argument(args.PlaceInitT, "--init_t")
@@ -1386,6 +1519,13 @@ argparse::ArgumentParser create_arg_parser(std::string prog_name, t_options& arg
         .help(
             "File to write detailed placer move statistics to")
         .default_value("")
+        .show_in(argparse::ShowIn::HELP_ONLY);
+
+    place_grp.add_argument(args.placement_saves_per_temperature, "--save_placement_per_temperature")
+        .help(
+            "Controls how often VPR saves the current placement to a file per temperature (may be helpful for debugging)."
+            " The value specifies how many times the placement should be saved (values less than 1 disable this feature).")
+        .default_value("0")
         .show_in(argparse::ShowIn::HELP_ONLY);
 
     auto& place_timing_grp = parser.add_argument_group("timing-driven placement options");
@@ -1529,13 +1669,9 @@ argparse::ArgumentParser create_arg_parser(std::string prog_name, t_options& arg
             "      to magnitude of typical routing resource delay\n"
             " * delay_normalized_length: like delay_normalized but\n"
             "      scaled by routing resource length\n"
-            " * delay_normalized_length_bounded: like delay_normalized but\n"
-            "      scaled by routing resource length.  Scaling is normalized\n"
-            "      between 1 to 4, with min lengths getting scaled at 1,\n"
-            "      and max lengths getting scaled at 4.\n"
-            " * delay_normalized_frequency: like delay_normalized\n"
+            " * delay_normalized_freqeuncy: like delay_normalized\n"
             "      but scaled inversely by segment type frequency\n"
-            " * delay_normalized_length_frequency: like delay_normalized\n"
+            " * delay_normalized_length_freqeuncy: like delay_normalized\n"
             "      but scaled by routing resource length, and inversely\n"
             "      by segment type frequency\n"
             "(Default: demand_only for breadth-first router,\n"
@@ -1584,6 +1720,11 @@ argparse::ArgumentParser create_arg_parser(std::string prog_name, t_options& arg
     route_grp.add_argument(args.min_incremental_reroute_fanout, "--min_incremental_reroute_fanout")
         .help("The net fanout threshold above which nets will be re-routed incrementally.")
         .default_value("16")
+        .show_in(argparse::ShowIn::HELP_ONLY);
+
+    route_grp.add_argument<bool, ParseOnOff>(args.exit_after_first_routing_iteration, "--exit_after_first_routing_iteration")
+        .help("Causes VPR to exit after the first routing iteration (useful for saving graphics)")
+        .default_value("off")
         .show_in(argparse::ShowIn::HELP_ONLY);
 
     auto& route_timing_grp = parser.add_argument_group("timing-driven routing options");
@@ -1676,9 +1817,10 @@ argparse::ArgumentParser create_arg_parser(std::string prog_name, t_options& arg
     route_timing_grp.add_argument<e_router_lookahead, ParseRouterLookahead>(args.router_lookahead_type, "--router_lookahead")
         .help(
             "Controls what lookahead the router uses to calculate cost of completing a connection.\n"
-            " * classic: The classic VPR lookahead\n"
+            " * classic: The classic VPR lookahead (may perform better on un-buffered routing\n"
+            "            architectures)\n"
             " * map: A more advanced lookahead which accounts for diverse wire type\n")
-        .default_value("classic")
+        .default_value("map")
         .show_in(argparse::ShowIn::HELP_ONLY);
 
     route_timing_grp.add_argument(args.router_max_convergence_count, "--router_max_convergence_count")
@@ -1705,8 +1847,15 @@ argparse::ArgumentParser create_arg_parser(std::string prog_name, t_options& arg
             " * lookahead   : Connection criticalities are determined\n"
             "                 from timing analysis assuming best-case\n"
             "                 connection delays as estimated by the\n"
-            "                 router's lookahead.\n")
-        .default_value("all_critical")
+            "                 router's lookahead.\n"
+            "(Default: 'lookahead' if a non-classic router lookahead is\n"
+            "           used, otherwise 'all_critical')\n")
+        .default_value("lookahead")
+        .show_in(argparse::ShowIn::HELP_ONLY);
+
+    route_timing_grp.add_argument<bool, ParseOnOff>(args.router_update_lower_bound_delays, "--router_update_lower_bound_delays")
+        .help("Controls whether the router updates lower bound connection delays after the 1st routing iteration.")
+        .default_value("on")
         .show_in(argparse::ShowIn::HELP_ONLY);
 
     route_timing_grp.add_argument<e_heap_type, ParseRouterHeap>(args.router_heap, "--router_heap")
@@ -1720,11 +1869,6 @@ argparse::ArgumentParser create_arg_parser(std::string prog_name, t_options& arg
         .default_value("binary")
         .show_in(argparse::ShowIn::HELP_ONLY);
 
-    route_timing_grp.add_argument<bool, ParseOnOff>(args.router_update_lower_bound_delays, "--router_update_lower_bound_delays")
-        .help("Controls whether the router updates lower bound connection delays after the 1st routing iteration.")
-        .default_value("off")
-        .show_in(argparse::ShowIn::HELP_ONLY);
-
     route_timing_grp.add_argument(args.router_first_iteration_timing_report_file, "--router_first_iter_timing_report")
         .help("Name of the post first routing iteration timing report file (not generated if unspecfied)")
         .default_value("")
@@ -1732,16 +1876,6 @@ argparse::ArgumentParser create_arg_parser(std::string prog_name, t_options& arg
 
     route_timing_grp.add_argument<bool, ParseOnOff>(args.read_rr_edge_metadata, "--read_rr_edge_metadata")
         .help("Read RR edge metadata from --read_rr_graph.  RR edge metadata is not used in core VPR algorithms, and is typically not read to save runtime and memory. (Default: off).")
-        .default_value("off")
-        .show_in(argparse::ShowIn::HELP_ONLY);
-
-    route_timing_grp.add_argument<bool, ParseOnOff>(args.disable_check_route, "--disable_check_route")
-        .help("Disables check_route once routing step has finished or when routing file is loaded")
-        .default_value("off")
-        .show_in(argparse::ShowIn::HELP_ONLY);
-
-    route_timing_grp.add_argument<bool, ParseOnOff>(args.quick_check_route, "--quick_check_route")
-        .help("Runs check_route, disabling slow checks, once routing step has finished or when routing file is loaded")
         .default_value("off")
         .show_in(argparse::ShowIn::HELP_ONLY);
 
@@ -2008,6 +2142,15 @@ void set_conditional_defaults(t_options& args) {
             args.bend_cost.set(0., Provenance::INFERRED);
         }
     }
+
+    //Initial timing estimate
+    if (args.router_initial_timing.provenance() != Provenance::SPECIFIED) {
+        if (args.router_lookahead_type != e_router_lookahead::CLASSIC) {
+            args.router_initial_timing.set(e_router_initial_timing::LOOKAHEAD, Provenance::INFERRED);
+        } else {
+            args.router_initial_timing.set(e_router_initial_timing::ALL_CRITICAL, Provenance::INFERRED);
+        }
+    }
 }
 
 bool verify_args(const t_options& args) {
@@ -2026,6 +2169,13 @@ bool verify_args(const t_options& args) {
                         "%s option must be enabled for %s to have any effect\n",
                         args.enable_clustering_pin_feasibility_filter.argument_name().c_str(),
                         args.target_external_pin_util.argument_name().c_str());
+    }
+
+    if (args.router_initial_timing == e_router_initial_timing::LOOKAHEAD && args.router_lookahead_type == e_router_lookahead::CLASSIC) {
+        VPR_FATAL_ERROR(VPR_ERROR_OTHER,
+                        "%s option value 'lookahead' is not compatible with %s 'classic'\n",
+                        args.router_initial_timing.argument_name().c_str(),
+                        args.router_lookahead_type.argument_name().c_str());
     }
 
     return true;

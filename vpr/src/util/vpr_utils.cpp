@@ -417,6 +417,7 @@ std::vector<AtomPinId> find_clb_pin_connected_atom_pins(ClusterBlockId clb, int 
     auto physical_tile = pick_best_physical_type(logical_block);
 
     int physical_pin = get_physical_pin(physical_tile, logical_block, logical_pin);
+    VTR_ASSERT(physical_pin >= 0);
 
     if (is_opin(physical_pin, physical_tile)) {
         //output
@@ -726,9 +727,7 @@ int get_unique_pb_graph_node_id(const t_pb_graph_node* pb_graph_node) {
     }
 }
 
-void get_class_range_for_block(const ClusterBlockId blk_id,
-                               int* class_low,
-                               int* class_high) {
+t_class_range get_class_range_for_block(const ClusterBlockId blk_id) {
     /* Assumes that the placement has been done so each block has a set of pins allocated to it */
     auto& place_ctx = g_vpr_ctx.placement();
 
@@ -741,8 +740,11 @@ void get_class_range_for_block(const ClusterBlockId blk_id,
     VTR_ASSERT((class_range_total) % sub_tile_capacity == 0);
     int rel_capacity = place_ctx.block_locs[blk_id].loc.sub_tile - sub_tile.capacity.low;
 
-    *class_low = rel_capacity * (class_range_total / sub_tile_capacity) + class_range.low;
-    *class_high = (rel_capacity + 1) * (class_range_total / sub_tile_capacity) - 1 + class_range.low;
+    t_class_range abs_class_range;
+    abs_class_range.low = rel_capacity * (class_range_total / sub_tile_capacity) + class_range.low;
+    abs_class_range.high = (rel_capacity + 1) * (class_range_total / sub_tile_capacity) - 1 + class_range.low;
+
+    return abs_class_range;
 }
 
 void get_pin_range_for_block(const ClusterBlockId blk_id,
@@ -2122,7 +2124,7 @@ void place_sync_external_block_connections(ClusterBlockId iblk) {
 
     for (auto pin : clb_nlist.block_pins(iblk)) {
         int logical_pin_index = clb_nlist.pin_logical_index(pin);
-        int physical_pin_index = get_physical_pin(sub_tile_index, physical_tile, logical_block, logical_pin_index);
+        int physical_pin_index = get_sub_tile_physical_pin(sub_tile_index, physical_tile, logical_block, logical_pin_index);
 
         int new_physical_pin_index = sub_tile.sub_tile_to_tile_pin_indices[physical_pin_index + rel_capacity * max_num_block_pins];
 
@@ -2161,10 +2163,10 @@ bool is_tile_compatible(t_physical_tile_type_ptr physical_tile, t_logical_block_
     return std::find(equivalent_tiles.begin(), equivalent_tiles.end(), physical_tile) != equivalent_tiles.end();
 }
 
-bool is_tile_compatible(t_physical_tile_type_ptr physical_tile, t_logical_block_type_ptr logical_block, t_pl_loc loc) {
+bool is_sub_tile_compatible(t_physical_tile_type_ptr physical_tile, t_logical_block_type_ptr logical_block, int sub_tile_loc) {
     bool capacity_compatible = false;
     for (auto& sub_tile : physical_tile->sub_tiles) {
-        if (sub_tile.capacity.is_in_range(loc.sub_tile)) {
+        if (sub_tile.capacity.is_in_range(sub_tile_loc)) {
             capacity_compatible = true;
             break;
         }
@@ -2217,10 +2219,10 @@ int get_logical_pin(t_physical_tile_type_ptr physical_tile,
     return result->second.pin;
 }
 
-int get_physical_pin(int sub_tile_index,
-                     t_physical_tile_type_ptr physical_tile,
-                     t_logical_block_type_ptr logical_block,
-                     int pin) {
+int get_sub_tile_physical_pin(int sub_tile_index,
+                              t_physical_tile_type_ptr physical_tile,
+                              t_logical_block_type_ptr logical_block,
+                              int pin) {
     t_logical_pin logical_pin(sub_tile_index, pin);
 
     const auto& direct_map = physical_tile->tile_block_pin_directs_map.at(logical_block->index);
@@ -2251,31 +2253,7 @@ int get_physical_pin(t_physical_tile_type_ptr physical_tile,
 
     VTR_ASSERT(sub_tile_index != OPEN);
 
-    t_logical_pin logical_pin(sub_tile_index, pin);
-
-    const auto& direct_map = physical_tile->tile_block_pin_directs_map.at(logical_block->index);
-    auto result = direct_map.find(logical_pin);
-
-    if (result == direct_map.end()) {
-        VTR_LOG_WARN(
-            "Couldn't find the corresponding physical pin of the logical pin %d."
-            "Physical Tile: %s, Logical Block: %s.\n",
-            pin, physical_tile->name, logical_block->name);
-        return OPEN;
-    }
-
-    return result->second.pin;
-}
-
-int get_physical_pin_offset(t_sub_tile* sub_tile,
-                            t_physical_tile_type_ptr physical_tile) {
-    int offset = 0;
-
-    for (int isub_tile = 0; isub_tile < sub_tile->index; isub_tile++) {
-        offset += physical_tile->sub_tiles[isub_tile].num_phy_pins;
-    }
-
-    return offset;
+    return get_sub_tile_physical_pin(sub_tile_index, physical_tile, logical_block, pin);
 }
 
 int net_pin_to_tile_pin_index(const ClusterNetId net_id, int net_pin_index) {

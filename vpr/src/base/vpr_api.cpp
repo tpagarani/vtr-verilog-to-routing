@@ -278,6 +278,7 @@ void vpr_init_with_options(const t_options* options, t_vpr_setup* vpr_setup, t_a
              &vpr_setup->ShowGraphics,
              &vpr_setup->GraphPause,
              &vpr_setup->SaveGraphics,
+             &vpr_setup->GraphicsCommands,
              &vpr_setup->PowerOpts);
 
     /* Check inputs are reasonable */
@@ -441,13 +442,16 @@ void vpr_create_device_grid(const t_vpr_setup& vpr_setup, const t_arch& Arch) {
         }
 
         if (device_ctx.grid.num_instances(&type) != 0) {
-            float util = 0.;
             VTR_LOG("\tPhysical Tile %s:\n", type.name);
 
             auto equivalent_sites = get_equivalent_sites_set(&type);
 
             for (auto logical_block : equivalent_sites) {
-                util = float(num_type_instances[logical_block]) / device_ctx.grid.num_instances(&type);
+                float util = 0.;
+                size_t num_inst = device_ctx.grid.num_instances(&type);
+                if (num_inst != 0) {
+                    util = float(num_type_instances[logical_block]) / num_inst;
+                }
                 VTR_LOG("\tBlock Utilization: %.2f Logical Block: %s\n", util, logical_block->name);
             }
         }
@@ -706,9 +710,7 @@ RouteStatus vpr_route_flow(t_vpr_setup& vpr_setup, const t_arch& arch) {
         std::string graphics_msg;
         if (route_status.success()) {
             //Sanity check the routing
-            if (!router_opts.disable_check_route) {
-                check_route(router_opts.route_type, router_opts.quick_check_route);
-            }
+            check_route(router_opts.route_type);
             get_serial_num();
 
             //Update status
@@ -879,8 +881,9 @@ void vpr_create_rr_graph(t_vpr_setup& vpr_setup, const t_arch& arch, int chan_wi
 void vpr_init_graphics(const t_vpr_setup& vpr_setup, const t_arch& arch) {
     /* Startup X graphics */
     init_graphics_state(vpr_setup.ShowGraphics, vpr_setup.GraphPause,
-                        vpr_setup.RouterOpts.route_type, vpr_setup.SaveGraphics);
-    if (vpr_setup.ShowGraphics || vpr_setup.SaveGraphics)
+                        vpr_setup.RouterOpts.route_type, vpr_setup.SaveGraphics,
+                        vpr_setup.GraphicsCommands);
+    if (vpr_setup.ShowGraphics || vpr_setup.SaveGraphics || !vpr_setup.GraphicsCommands.empty())
         alloc_draw_structs(&arch);
 }
 
@@ -991,7 +994,7 @@ void free_device(const t_det_routing_arch& routing_arch) {
     device_ctx.chan_width.max = device_ctx.chan_width.x_max = device_ctx.chan_width.y_max = device_ctx.chan_width.x_min = device_ctx.chan_width.y_min = 0;
 
     for (int iswitch : {routing_arch.delayless_switch, routing_arch.global_route_switch}) {
-        if (device_ctx.arch_switch_inf[iswitch].name) {
+        if (device_ctx.arch_switch_inf != nullptr && device_ctx.arch_switch_inf[iswitch].name) {
             vtr::free(device_ctx.arch_switch_inf[iswitch].name);
             device_ctx.arch_switch_inf[iswitch].name = nullptr;
         }
@@ -1096,6 +1099,7 @@ void vpr_setup_vpr(t_options* Options,
                    bool* ShowGraphics,
                    int* GraphPause,
                    bool* SaveGraphics,
+                   std::string* GraphicsCommands,
                    t_power_opts* PowerOpts) {
     SetupVPR(Options,
              TimingEnabled,
@@ -1117,6 +1121,7 @@ void vpr_setup_vpr(t_options* Options,
              ShowGraphics,
              GraphPause,
              SaveGraphics,
+             GraphicsCommands,
              PowerOpts);
 }
 

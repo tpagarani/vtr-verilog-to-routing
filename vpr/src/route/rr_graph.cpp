@@ -32,7 +32,6 @@
 #include "rr_graph_writer.h"
 #include "rr_graph_reader.h"
 #include "router_lookahead_map.h"
-#include "connection_box_lookahead_map.h"
 #include "rr_graph_clock.h"
 
 #include "rr_types.h"
@@ -885,7 +884,6 @@ void load_rr_switch_from_arch_switch(int arch_switch_idx,
     device_ctx.rr_switch_inf[rr_switch_idx].Cin = device_ctx.arch_switch_inf[arch_switch_idx].Cin;
     device_ctx.rr_switch_inf[rr_switch_idx].Cinternal = device_ctx.arch_switch_inf[arch_switch_idx].Cinternal;
     device_ctx.rr_switch_inf[rr_switch_idx].Cout = device_ctx.arch_switch_inf[arch_switch_idx].Cout;
-    device_ctx.rr_switch_inf[rr_switch_idx].penalty_cost = device_ctx.arch_switch_inf[arch_switch_idx].penalty_cost;
     device_ctx.rr_switch_inf[rr_switch_idx].Tdel = rr_switch_Tdel;
     device_ctx.rr_switch_inf[rr_switch_idx].mux_trans_size = device_ctx.arch_switch_inf[arch_switch_idx].mux_trans_size;
     if (device_ctx.arch_switch_inf[arch_switch_idx].buf_size_type == BufferSize::AUTO) {
@@ -1399,9 +1397,9 @@ static void build_rr_sinks_sources(const int i,
 
     auto type = grid[i][j].type;
     int num_class = (int)type->class_inf.size();
-    std::vector<t_class> class_inf = type->class_inf;
+    const std::vector<t_class>& class_inf = type->class_inf;
     int num_pins = type->num_pins;
-    std::vector<int> pin_class = type->pin_class;
+    const std::vector<int>& pin_class = type->pin_class;
 
     /* SINK and SOURCE-to-OPIN edges */
     for (int iclass = 0; iclass < num_class; ++iclass) {
@@ -1434,6 +1432,8 @@ static void build_rr_sinks_sources(const int i,
         } else { /* SINK */
             VTR_ASSERT(class_inf[iclass].type == RECEIVER);
             inode = get_rr_node_index(L_rr_node_indices, i, j, SINK, iclass);
+
+            VTR_ASSERT(inode >= 0);
 
             /* NOTE:  To allow route throughs through clbs, change the lines below to  *
              * make an edge from the input SINK to the output SOURCE.  Do for just the *

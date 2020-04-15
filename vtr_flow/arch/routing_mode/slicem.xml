@@ -3,8 +3,8 @@
   <models>
     <model name="CARRY">
       <input_ports>
-        <port combinational_sink_ports="CO_FABRIC CO_CHAIN O" name="CI"/>
-        <port combinational_sink_ports="CO_FABRIC CO_CHAIN O" name="S"/>
+        <port combinational_sink_ports="CO_CHAIN O CO_FABRIC" name="CI"/>
+        <port combinational_sink_ports="CO_CHAIN O CO_FABRIC" name="S"/>
       </input_ports>
       <output_ports>
         <port name="CO_CHAIN"/>
@@ -14,9 +14,9 @@
     </model>
     <model name="CARRY0">
       <input_ports>
-        <port combinational_sink_ports="CO_FABRIC CO_CHAIN O" name="CI"/>
-        <port combinational_sink_ports="CO_FABRIC CO_CHAIN O" name="CI_INIT"/>
-        <port combinational_sink_ports="CO_FABRIC CO_CHAIN O" name="S"/>
+        <port combinational_sink_ports="CO_CHAIN O CO_FABRIC" name="CI"/>
+        <port combinational_sink_ports="CO_CHAIN O CO_FABRIC" name="CI_INIT"/>
+        <port combinational_sink_ports="CO_CHAIN O CO_FABRIC" name="S"/>
       </input_ports>
       <output_ports>
         <port name="CO_CHAIN"/>

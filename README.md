@@ -1,14 +1,5 @@
-
-SymbiFlow WIP changes for Verilog to Routing (VTR)
-==================================================
-
-This branch contains work in progress changes for using Verilog to Routing
-(VTR) as part of SymbiFlow.
-
----
-
 # Verilog to Routing (VTR)
-[![Build Status](https://travis-ci.com/SymbiFlow/vtr-verilog-to-routing.svg?branch=master)](https://travis-ci.com/SymbiFlow/vtr-verilog-to-routing) [![Documentation Status](https://readthedocs.org/projects/vtr/badge/?version=latest)](http://docs.verilogtorouting.org/en/latest/?badge=latest)
+[![Build Status](https://travis-ci.com/verilog-to-routing/vtr-verilog-to-routing.svg?branch=master)](https://travis-ci.com/verilog-to-routing/vtr-verilog-to-routing) [![Documentation Status](https://readthedocs.org/projects/vtr/badge/?version=latest)](http://docs.verilogtorouting.org/en/latest/)
 
 ## Introduction
 The Verilog-to-Routing (VTR) project is a world-wide collaborative effort to provide a open-source framework for conducting FPGA architecture and CAD research and development.
@@ -22,6 +13,15 @@ to generate FPGA speed and area results.
 VTR includes a set of benchmark designs known to work with the design flow.
 
 VTR can also produce [FASM](https://symbiflow.readthedocs.io/en/latest/fasm/docs/specification.html) to program some commercial FPGAs (via [Symbiflow](https://symbiflow.github.io/))
+
+| Placement (carry-chains highlighted) | Critical Path |
+| ------------------------------------ | ------------- |
+| <img src="https://verilogtorouting.org/img/des90_placement_macros.gif" width="350"/> | <img src="https://verilogtorouting.org/img/des90_cpd.gif" width="350"/> | 
+
+| Logical Connections | Routing Utilziation |
+| ------------------- | ------------------- |
+| <img src="https://verilogtorouting.org/img/des90_nets.gif" width="350"/> | <img src="https://verilogtorouting.org/img/des90_routing_util.gif" width="350"/> |
+
 
 ## Documentation
 VTR's [full documentation](https://docs.verilogtorouting.org) includes tutorials, descriptions of the VTR design flow, and tool options.

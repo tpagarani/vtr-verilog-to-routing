@@ -25,6 +25,7 @@
 #include "vtr_memory.h"
 #include "vtr_log.h"
 #include "vtr_color_map.h"
+#include "vtr_path.h"
 
 #include "vpr_utils.h"
 #include "vpr_error.h"
@@ -143,13 +144,14 @@ void initial_setup_NO_PICTURE_to_ROUTING_with_crit_path(ezgl::application* app, 
 void toggle_window_mode(GtkWidget* /*widget*/, ezgl::application* /*app*/);
 void setup_default_ezgl_callbacks(ezgl::application* app);
 void set_force_pause(GtkWidget* /*widget*/, gint /*response_id*/, gpointer /*data*/);
+void run_graphics_commands(std::string commands);
 
 /************************** File Scope Variables ****************************/
 
 //The arrow head position for turning/straight-thru connections in a switch box
 constexpr float SB_EDGE_TURN_ARROW_POSITION = 0.2;
 constexpr float SB_EDGE_STRAIGHT_ARROW_POSITION = 0.95;
-constexpr float EMPTY_BLOCK_LIGHTEN_FACTOR = 0.10;
+constexpr float EMPTY_BLOCK_LIGHTEN_FACTOR = 0.20;
 
 //Kelly's maximum contrast colors are selected to be easily distinguishable as described in:
 //  Kenneth Kelly, "Twenty-Two Colors of Maximum Contrast", Color Eng. 3(6), 1943
@@ -198,7 +200,7 @@ std::string rr_highlight_message;
 
 /********************** Subroutine definitions ******************************/
 
-void init_graphics_state(bool show_graphics_val, int gr_automode_val, enum e_route_type route_type, bool save_graphics) {
+void init_graphics_state(bool show_graphics_val, int gr_automode_val, enum e_route_type route_type, bool save_graphics, std::string graphics_commands) {
 #ifndef NO_GRAPHICS
     /* Call accessor functions to retrieve global variables. */
     t_draw_state* draw_state = get_draw_state_vars();
@@ -211,12 +213,15 @@ void init_graphics_state(bool show_graphics_val, int gr_automode_val, enum e_rou
     draw_state->gr_automode = gr_automode_val;
     draw_state->draw_route_type = route_type;
     draw_state->save_graphics = save_graphics;
+    draw_state->graphics_commands = graphics_commands;
 
 #else
+    //Suppress unused parameter warnings
     (void)show_graphics_val;
     (void)gr_automode_val;
     (void)route_type;
     (void)save_graphics;
+    (void)graphics_commands;
 #endif // NO_GRAPHICS
 }
 
@@ -425,7 +430,11 @@ void update_screen(ScreenUpdatePriority priority, const char* msg, enum pic_type
     /* If it's the type of picture displayed has changed, set up the proper  *
      * buttons.                                                              */
     if (draw_state->pic_on_screen != pic_on_screen_val) { //State changed
-        application.add_canvas("MainCanvas", draw_main_canvas, initial_world);
+
+        if (draw_state->pic_on_screen == NO_PICTURE) {
+            //Only add the canvas the first time we open graphics
+            application.add_canvas("MainCanvas", draw_main_canvas, initial_world);
+        }
 
         draw_state->setup_timing_info = setup_timing_info;
 
@@ -483,6 +492,10 @@ void update_screen(ScreenUpdatePriority priority, const char* msg, enum pic_type
         }
 
         application.run(init_setup, act_on_mouse_press, act_on_mouse_move, act_on_key_press);
+
+        if (!draw_state->graphics_commands.empty()) {
+            run_graphics_commands(draw_state->graphics_commands);
+        }
     }
 
     if (draw_state->show_graphics) {
@@ -876,7 +889,7 @@ void init_draw_coords(float width_val) {
     t_draw_coords* draw_coords = get_draw_coords_vars();
     auto& device_ctx = g_vpr_ctx.device();
 
-    if (!draw_state->show_graphics && !draw_state->save_graphics)
+    if (!draw_state->show_graphics && !draw_state->save_graphics && draw_state->graphics_commands.empty())
         return; //do not initialize only if --disp off and --save_graphics off
     /* Each time routing is on screen, need to reallocate the color of each *
      * rr_node, as the number of rr_nodes may change.						*/
@@ -983,20 +996,25 @@ static void drawplace(ezgl::renderer* g) {
                 g->set_color(ezgl::BLACK);
 
                 g->set_line_dash((EMPTY_BLOCK_ID == bnum) ? ezgl::line_dash::asymmetric_5_3 : ezgl::line_dash::none);
-                g->draw_rectangle(abs_clb_bbox);
-                /* Draw text if the space has parts of the netlist */
-                if (bnum != EMPTY_BLOCK_ID && bnum != INVALID_BLOCK_ID) {
-                    std::string name = cluster_ctx.clb_nlist.block_name(bnum) + vtr::string_fmt(" (#%zu)", size_t(bnum));
-
-                    g->draw_text(center, name.c_str(), abs_clb_bbox.width(), abs_clb_bbox.height());
+                if (draw_state->draw_block_outlines) {
+                    g->draw_rectangle(abs_clb_bbox);
                 }
-                /* Draw text for block type so that user knows what block */
-                if (device_ctx.grid[i][j].width_offset == 0 && device_ctx.grid[i][j].height_offset == 0) {
-                    std::string block_type_loc = device_ctx.grid[i][j].type->name;
-                    block_type_loc += vtr::string_fmt(" (%d,%d)", i, j);
 
-                    g->draw_text(center - ezgl::point2d(0, abs_clb_bbox.height() / 4),
-                                 block_type_loc.c_str(), abs_clb_bbox.width(), abs_clb_bbox.height());
+                if (draw_state->draw_block_text) {
+                    /* Draw text if the space has parts of the netlist */
+                    if (bnum != EMPTY_BLOCK_ID && bnum != INVALID_BLOCK_ID) {
+                        std::string name = cluster_ctx.clb_nlist.block_name(bnum) + vtr::string_fmt(" (#%zu)", size_t(bnum));
+
+                        g->draw_text(center, name.c_str(), abs_clb_bbox.width(), abs_clb_bbox.height());
+                    }
+                    /* Draw text for block type so that user knows what block */
+                    if (device_ctx.grid[i][j].width_offset == 0 && device_ctx.grid[i][j].height_offset == 0) {
+                        std::string block_type_loc = device_ctx.grid[i][j].type->name;
+                        block_type_loc += vtr::string_fmt(" (%d,%d)", i, j);
+
+                        g->draw_text(center - ezgl::point2d(0, abs_clb_bbox.height() / 4),
+                                     block_type_loc.c_str(), abs_clb_bbox.width(), abs_clb_bbox.height());
+                    }
                 }
             }
         }
@@ -1069,7 +1087,7 @@ static void draw_congestion(ezgl::renderer* g) {
     }
     application.update_message(msg);
 
-    std::unique_ptr<vtr::ColorMap> cmap = std::make_unique<vtr::PlasmaColorMap>(min_congestion_ratio, max_congestion_ratio);
+    std::shared_ptr<vtr::ColorMap> cmap = std::make_shared<vtr::PlasmaColorMap>(min_congestion_ratio, max_congestion_ratio);
 
     //Sort the nodes in ascending order of value for drawing, this ensures high
     //valued nodes are not overdrawn by lower value ones (e.g-> when zoomed-out far)
@@ -3385,7 +3403,13 @@ static void draw_routing_util(ezgl::renderer* g) {
     }
     max_util = std::max(max_util, 1.f);
 
-    std::unique_ptr<vtr::ColorMap> cmap = std::make_unique<vtr::PlasmaColorMap>(min_util, max_util);
+    std::unique_ptr<vtr::ColorMap> cmap;
+
+    if (draw_state->clip_routing_util) {
+        cmap = std::make_unique<vtr::PlasmaColorMap>(0., 1.);
+    } else {
+        cmap = std::make_unique<vtr::PlasmaColorMap>(min_util, max_util);
+    }
 
     float tile_width = draw_coords->get_tile_width();
     float tile_height = draw_coords->get_tile_height();
@@ -3403,6 +3427,9 @@ static void draw_routing_util(ezgl::renderer* g) {
             int chan_count = 0;
             if (x > 0) {
                 chanx_util = routing_util(chanx_usage[x][y], chanx_avail[x][y]);
+                if (draw_state->clip_routing_util) {
+                    chanx_util = std::min(chanx_util, 1.f);
+                }
                 ezgl::color chanx_color = to_ezgl_color(cmap->color(chanx_util));
                 chanx_color.alpha *= ALPHA;
                 g->set_color(chanx_color);
@@ -3423,6 +3450,9 @@ static void draw_routing_util(ezgl::renderer* g) {
 
             if (y > 0) {
                 chany_util = routing_util(chany_usage[x][y], chany_avail[x][y]);
+                if (draw_state->clip_routing_util) {
+                    chany_util = std::min(chany_util, 1.f);
+                }
                 ezgl::color chany_color = to_ezgl_color(cmap->color(chany_util));
                 chany_color.alpha *= ALPHA;
                 g->set_color(chany_color);
@@ -3450,6 +3480,9 @@ static void draw_routing_util(ezgl::renderer* g) {
 
             VTR_ASSERT(chan_count > 0);
             sb_util /= chan_count;
+            if (draw_state->clip_routing_util) {
+                sb_util = std::min(sb_util, 1.f);
+            }
             ezgl::color sb_color = to_ezgl_color(cmap->color(sb_util));
             sb_color.alpha *= ALPHA;
             g->set_color(sb_color);
@@ -3742,6 +3775,90 @@ void set_force_pause(GtkWidget* /*widget*/, gint /*response_id*/, gpointer /*dat
     t_draw_state* draw_state = get_draw_state_vars();
 
     draw_state->forced_pause = true;
+}
+
+void run_graphics_commands(std::string commands) {
+    //A very simmple command interpreter for scripting graphics
+    t_draw_state* draw_state = get_draw_state_vars();
+
+    t_draw_state backup_draw_state = *draw_state;
+
+    std::vector<std::vector<std::string>> cmds;
+    for (std::string raw_cmd : vtr::split(commands, ";")) {
+        cmds.push_back(vtr::split(raw_cmd));
+    }
+
+    for (auto& cmd : cmds) {
+        VTR_ASSERT_MSG(cmd.size() > 0, "Expect non-empty graphics commands");
+
+        for (auto& item : cmd) {
+            VTR_LOG("%s ", item.c_str());
+        }
+        VTR_LOG("\n");
+
+        if (cmd[0] == "save_graphics") {
+            VTR_ASSERT_MSG(cmd.size() == 2, "Expect filename after 'save_graphics'");
+
+            auto name_ext = vtr::split_ext(cmd[1]);
+
+            //Replace {i}  with the sequence number
+            std::string name = vtr::replace_all(name_ext[0], "{i}", std::to_string(draw_state->sequence_number));
+
+            save_graphics(/*extension=*/name_ext[1], /*filename=*/name);
+            VTR_LOG("Saving to %s\n", std::string(name + name_ext[1]).c_str());
+
+        } else if (cmd[0] == "set_macros") {
+            VTR_ASSERT_MSG(cmd.size() == 2, "Expect net draw state after 'set_macro'");
+            draw_state->show_placement_macros = (e_draw_placement_macros)vtr::atoi(cmd[1]);
+            VTR_LOG("%d\n", (int)draw_state->show_placement_macros);
+        } else if (cmd[0] == "set_nets") {
+            VTR_ASSERT_MSG(cmd.size() == 2, "Expect net draw state after 'set_nets'");
+            draw_state->show_nets = (e_draw_nets)vtr::atoi(cmd[1]);
+            VTR_LOG("%d\n", (int)draw_state->show_nets);
+        } else if (cmd[0] == "set_cpd") {
+            VTR_ASSERT_MSG(cmd.size() == 2, "Expect cpd draw state after 'set_cpd'");
+            draw_state->show_crit_path = (e_draw_crit_path)vtr::atoi(cmd[1]);
+            VTR_LOG("%d\n", (int)draw_state->show_crit_path);
+        } else if (cmd[0] == "set_routing_util") {
+            VTR_ASSERT_MSG(cmd.size() == 2, "Expect routing util draw state after 'set_routing_util'");
+            draw_state->show_routing_util = (e_draw_routing_util)vtr::atoi(cmd[1]);
+            VTR_LOG("%d\n", (int)draw_state->show_routing_util);
+        } else if (cmd[0] == "set_clip_routing_util") {
+            VTR_ASSERT_MSG(cmd.size() == 2, "Expect routing util draw state after 'set_routing_util'");
+            draw_state->clip_routing_util = (bool)vtr::atoi(cmd[1]);
+            VTR_LOG("%d\n", (int)draw_state->clip_routing_util);
+        } else if (cmd[0] == "set_congestion") {
+            VTR_ASSERT_MSG(cmd.size() == 2, "Expect congestion draw state after 'set_congestion'");
+            draw_state->show_congestion = (e_draw_congestion)vtr::atoi(cmd[1]);
+            VTR_LOG("%d\n", (int)draw_state->show_congestion);
+        } else if (cmd[0] == "set_draw_block_outlines") {
+            VTR_ASSERT_MSG(cmd.size() == 2, "Expect draw block outlines state after 'set_draw_block_outlines'");
+            draw_state->draw_block_outlines = vtr::atoi(cmd[1]);
+            VTR_LOG("%d\n", (int)draw_state->draw_block_outlines);
+        } else if (cmd[0] == "set_draw_block_text") {
+            VTR_ASSERT_MSG(cmd.size() == 2, "Expect draw block text state after 'set_draw_block_text'");
+            draw_state->draw_block_text = vtr::atoi(cmd[1]);
+            VTR_LOG("%d\n", (int)draw_state->draw_block_text);
+        } else if (cmd[0] == "set_draw_block_internals") {
+            VTR_ASSERT_MSG(cmd.size() == 2, "Expect draw state after 'set_draw_block_internals'");
+            draw_state->show_blk_internal = vtr::atoi(cmd[1]);
+            VTR_LOG("%d\n", (int)draw_state->show_blk_internal);
+        } else if (cmd[0] == "set_draw_net_max_fanout") {
+            VTR_ASSERT_MSG(cmd.size() == 2, "Expect maximum fanout after 'set_draw_net_max_fanout'");
+            draw_state->draw_net_max_fanout = vtr::atoi(cmd[1]);
+            VTR_LOG("%d\n", (int)draw_state->draw_net_max_fanout);
+        } else if (cmd[0] == "exit") {
+            VTR_ASSERT_MSG(cmd.size() == 2, "Expect exit code after 'exit'");
+            exit(vtr::atoi(cmd[1]));
+        } else {
+            VPR_ERROR(VPR_ERROR_DRAW, vtr::string_fmt("Unrecognized graphics command '%s'", cmd[0].c_str()).c_str());
+        }
+    }
+
+    *draw_state = backup_draw_state; //Restor original draw state
+
+    //Advance the sequence number
+    ++draw_state->sequence_number;
 }
 
 #endif /* NO_GRAPHICS */

@@ -138,9 +138,9 @@
     </model>
     <model name="adder">
       <input_ports>
-        <port name="a" combinational_sink_ports="cout sumout"/>
-        <port name="b" combinational_sink_ports="cout sumout"/>
-        <port name="cin" combinational_sink_ports="cout sumout"/>
+        <port name="a" combinational_sink_ports="sumout cout"/>
+        <port name="b" combinational_sink_ports="sumout cout"/>
+        <port name="cin" combinational_sink_ports="sumout cout"/>
       </input_ports>
       <output_ports>
         <port name="cout"/>
