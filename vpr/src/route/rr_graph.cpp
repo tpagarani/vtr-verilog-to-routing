@@ -1399,9 +1399,9 @@ static void build_rr_sinks_sources(const int i,
 
     auto type = grid[i][j].type;
     int num_class = (int)type->class_inf.size();
-    std::vector<t_class> class_inf = type->class_inf;
+    const std::vector<t_class>& class_inf = type->class_inf;
     int num_pins = type->num_pins;
-    std::vector<int> pin_class = type->pin_class;
+    const std::vector<int>& pin_class = type->pin_class;
 
     /* SINK and SOURCE-to-OPIN edges */
     for (int iclass = 0; iclass < num_class; ++iclass) {
@@ -1434,6 +1434,8 @@ static void build_rr_sinks_sources(const int i,
         } else { /* SINK */
             VTR_ASSERT(class_inf[iclass].type == RECEIVER);
             inode = get_rr_node_index(L_rr_node_indices, i, j, SINK, iclass);
+
+            VTR_ASSERT(inode >= 0);
 
             /* NOTE:  To allow route throughs through clbs, change the lines below to  *
              * make an edge from the input SINK to the output SOURCE.  Do for just the *

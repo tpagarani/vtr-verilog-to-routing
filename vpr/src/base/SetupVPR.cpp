@@ -65,6 +65,7 @@ void SetupVPR(const t_options* Options,
               bool* ShowGraphics,
               int* GraphPause,
               bool* SaveGraphics,
+              std::string* GraphicsCommands,
               t_power_opts* PowerOpts) {
     using argparse::Provenance;
 
@@ -235,6 +236,7 @@ void SetupVPR(const t_options* Options,
     *ShowGraphics = Options->show_graphics;
 
     *SaveGraphics = Options->save_graphics;
+    *GraphicsCommands = Options->graphics_commands;
 
     if (getEchoEnabled() && isEchoFileEnabled(E_ECHO_ARCH)) {
         EchoArch(getEchoFileName(E_ECHO_ARCH), device_ctx.physical_tile_types, device_ctx.logical_block_types, Arch);
@@ -379,6 +381,7 @@ static void SetupRouterOpts(const t_options& Options, t_router_opts* RouterOpts)
     RouterOpts->read_router_lookahead = Options.read_router_lookahead;
 
     RouterOpts->router_heap = Options.router_heap;
+    RouterOpts->exit_after_first_routing_iteration = Options.exit_after_first_routing_iteration;
     RouterOpts->disable_check_route = Options.disable_check_route;
     RouterOpts->quick_check_route = Options.quick_check_route;
 }
@@ -508,6 +511,8 @@ static void SetupPlacerOpts(const t_options& Options, t_placer_opts* PlacerOpts)
 
     PlacerOpts->rlim_escape_fraction = Options.place_rlim_escape_fraction;
     PlacerOpts->move_stats_file = Options.place_move_stats_file;
+    PlacerOpts->placement_saves_per_temperature = Options.placement_saves_per_temperature;
+    PlacerOpts->place_delta_delay_matrix_calculation_method = Options.place_delta_delay_matrix_calculation_method;
 
     PlacerOpts->strict_checks = Options.strict_checks;
 
@@ -515,6 +520,8 @@ static void SetupPlacerOpts(const t_options& Options, t_placer_opts* PlacerOpts)
     PlacerOpts->read_placement_delay_lookup = Options.read_placement_delay_lookup;
 
     PlacerOpts->allowed_tiles_for_delay_model = Options.allowed_tiles_for_delay_model;
+
+    PlacerOpts->effort_scaling = Options.place_effort_scaling;
 }
 
 static void SetupAnalysisOpts(const t_options& Options, t_analysis_opts& analysis_opts) {

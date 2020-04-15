@@ -781,6 +781,11 @@ enum e_place_algorithm {
     PATH_TIMING_DRIVEN_PLACE
 };
 
+enum e_place_effort_scaling {
+    CIRCUIT,       //Effort scales based on circuit size only
+    DEVICE_CIRCUIT //Effort scales based on both circuit and device size
+};
+
 enum class PlaceDelayModelType {
     DELTA,          //Delta x/y based delay model
     DELTA_OVERRIDE, //Delta x/y based delay model with special case delay overrides
@@ -801,6 +806,11 @@ enum class e_file_type {
     NONE
 };
 
+enum class e_place_delta_delay_algorithm {
+    ASTAR_ROUTE,
+    DIJKSTRA_EXPANSION,
+};
+
 struct t_placer_opts {
     enum e_place_algorithm place_algorithm;
     float timing_tradeoff;
@@ -818,6 +828,8 @@ struct t_placer_opts {
     e_stage_action doPlacement;
     float rlim_escape_fraction;
     std::string move_stats_file;
+    int placement_saves_per_temperature;
+    e_place_effort_scaling effort_scaling;
 
     PlaceDelayModelType delay_model_type;
     e_reducer delay_model_reducer;
@@ -840,6 +852,8 @@ struct t_placer_opts {
     // Useful for excluding tiles that have abnormal delay behavior, e.g.
     // clock tree elements like PLL's, global/local clock buffers, etc.
     std::string allowed_tiles_for_delay_model;
+
+    e_place_delta_delay_algorithm place_delta_delay_matrix_calculation_method;
 };
 
 /* All the parameters controlling the router's operation are in this        *
@@ -987,6 +1001,7 @@ struct t_router_opts {
     std::string read_router_lookahead;
 
     e_heap_type router_heap;
+    bool exit_after_first_routing_iteration;
     bool disable_check_route;
     bool quick_check_route;
 };
@@ -1195,6 +1210,10 @@ typedef enum e_rr_type : unsigned char {
 constexpr std::array<t_rr_type, NUM_RR_TYPES> RR_TYPES = {{SOURCE, SINK, IPIN, OPIN, CHANX, CHANY}};
 constexpr std::array<const char*, NUM_RR_TYPES> rr_node_typename{{"SOURCE", "SINK", "IPIN", "OPIN", "CHANX", "CHANY"}};
 
+constexpr bool is_pin(e_rr_type type) { return (type == IPIN || type == OPIN); }
+constexpr bool is_chan(e_rr_type type) { return (type == CHANX || type == CHANY); }
+constexpr bool is_src_sink(e_rr_type type) { return (type == SOURCE || type == SINK); }
+
 //[0..num_rr_types-1][0..grid_width-1][0..grid_height-1][0..NUM_SIDES-1][0..max_ptc-1]
 typedef std::array<vtr::NdMatrix<std::vector<int>, 3>, NUM_RR_TYPES> t_rr_node_indices;
 
@@ -1363,6 +1382,7 @@ struct t_vpr_setup {
     bool ShowGraphics;                   /* option to show graphics */
     int GraphPause;                      /* user interactiveness graphics option */
     bool SaveGraphics;                   /* option to save graphical contents to pdf, png, or svg */
+    std::string GraphicsCommands;        /* commands to control graphics settings */
     t_power_opts PowerOpts;
     std::string device_layout;
     e_constant_net_method constant_net_method; //How constant nets should be handled

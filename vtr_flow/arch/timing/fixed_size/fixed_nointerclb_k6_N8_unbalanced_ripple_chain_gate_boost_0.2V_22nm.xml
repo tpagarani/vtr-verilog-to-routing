@@ -74,9 +74,9 @@ Each 2-to-1 mux adds 6 MWTAs for SRAM cell.
     </model>
     <model name="adder">
       <input_ports>
-        <port name="a" combinational_sink_ports="sumout cout"/>
-        <port name="b" combinational_sink_ports="sumout cout"/>
-        <port name="cin" combinational_sink_ports="sumout cout"/>
+        <port name="a" combinational_sink_ports="cout sumout"/>
+        <port name="b" combinational_sink_ports="cout sumout"/>
+        <port name="cin" combinational_sink_ports="cout sumout"/>
       </input_ports>
       <output_ports>
         <port name="cout"/>

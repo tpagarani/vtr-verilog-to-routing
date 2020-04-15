@@ -4,8 +4,8 @@
     <model name="fpu_mul">
       <input_ports>
         <port name="clk" is_clock="1"/>
-        <port name="opa" clock="clk" combinational_sink_ports="out control"/>
-        <port name="opb" clock="clk" combinational_sink_ports="out control"/>
+        <port name="opa" clock="clk" combinational_sink_ports="control out"/>
+        <port name="opb" clock="clk" combinational_sink_ports="control out"/>
       </input_ports>
       <output_ports>
         <port name="out" clock="clk"/>
@@ -15,8 +15,8 @@
     <model name="fpu_add">
       <input_ports>
         <port name="clk" is_clock="1"/>
-        <port name="opa" clock="clk" combinational_sink_ports="out control"/>
-        <port name="opb" clock="clk" combinational_sink_ports="out control"/>
+        <port name="opa" clock="clk" combinational_sink_ports="control out"/>
+        <port name="opb" clock="clk" combinational_sink_ports="control out"/>
       </input_ports>
       <output_ports>
         <port name="out" clock="clk"/>

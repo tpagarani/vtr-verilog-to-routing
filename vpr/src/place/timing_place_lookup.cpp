@@ -68,7 +68,6 @@ struct t_profile_info {
 static t_chan_width setup_chan_width(const t_router_opts& router_opts,
                                      t_chan_width_dist chan_width_dist);
 
-#if 0
 static float route_connection_delay(
     RouterDelayProfiler& route_profiler,
     int source_x_loc,
@@ -78,7 +77,22 @@ static float route_connection_delay(
     const t_router_opts& router_opts,
     bool measure_directconnect);
 
-static void generic_compute_matrix(
+// Prototype for computing delta delay matrix.
+typedef std::function<void(
+    RouterDelayProfiler&,
+    vtr::Matrix<std::vector<float>>&,
+    int,
+    int,
+    int,
+    int,
+    int,
+    int,
+    const t_router_opts&,
+    bool,
+    const std::set<std::string>&)>
+    t_compute_delta_delay_matrix;
+
+static void generic_compute_matrix_iterative_astar(
     RouterDelayProfiler& route_profiler,
     vtr::Matrix<std::vector<float>>& matrix,
     int source_x,
@@ -90,10 +104,9 @@ static void generic_compute_matrix(
     const t_router_opts& router_opts,
     bool measure_directconnect,
     const std::set<std::string>& allowed_types);
-#endif
 
-static void generic_compute_matrix_expand(
-    const RouterDelayProfiler& route_profiler,
+static void generic_compute_matrix_dijkstra_expansion(
+    RouterDelayProfiler& route_profiler,
     vtr::Matrix<std::vector<float>>& matrix,
     int source_x,
     int source_y,
@@ -314,7 +327,6 @@ static t_chan_width setup_chan_width(const t_router_opts& router_opts,
     return init_chan(width_fac, chan_width_dist);
 }
 
-#if 0
 static float route_connection_delay(
     RouterDelayProfiler& route_profiler,
     int source_x,
@@ -373,7 +385,6 @@ static float route_connection_delay(
 
     return (net_delay_value);
 }
-#endif
 
 static void add_delay_to_matrix(
     vtr::Matrix<std::vector<float>>* matrix,
@@ -389,8 +400,8 @@ static void add_delay_to_matrix(
     }
 }
 
-static void generic_compute_matrix_expand(
-    const RouterDelayProfiler& /*route_profiler*/,
+static void generic_compute_matrix_dijkstra_expansion(
+    RouterDelayProfiler& /*route_profiler*/,
     vtr::Matrix<std::vector<float>>& matrix,
     int source_x,
     int source_y,
@@ -405,7 +416,7 @@ static void generic_compute_matrix_expand(
 
     t_physical_tile_type_ptr src_type = device_ctx.grid[source_x][source_y].type;
     bool is_allowed_type = allowed_types.empty() || allowed_types.find(src_type->name) != allowed_types.end();
-    if (is_empty_type(src_type) || !is_allowed_type) {
+    if (src_type == device_ctx.EMPTY_PHYSICAL_TILE_TYPE || !is_allowed_type) {
         for (int sink_x = start_x; sink_x <= end_x; sink_x++) {
             for (int sink_y = start_y; sink_y <= end_y; sink_y++) {
                 int delta_x = abs(sink_x - source_x);
@@ -447,8 +458,7 @@ static void generic_compute_matrix_expand(
                 }
 
                 t_physical_tile_type_ptr sink_type = device_ctx.grid[sink_x][sink_y].type;
-                if (is_empty_type(sink_type)) {
-                    found_matrix[delta_x][delta_y] = true;
+                if (sink_type == device_ctx.EMPTY_PHYSICAL_TILE_TYPE) {
                     if (matrix[delta_x][delta_y].empty()) {
                         //Only set empty target if we don't already have a valid delta delay
                         matrix[delta_x][delta_y].push_back(EMPTY_DELTA);
@@ -459,6 +469,7 @@ static void generic_compute_matrix_expand(
                                 source_x, source_y,
                                 sink_x, sink_y);
 #endif
+                        found_matrix[delta_x][delta_y] = true;
                     }
                 } else {
                     bool found_a_sink = false;
@@ -520,8 +531,7 @@ static void generic_compute_matrix_expand(
     }
 }
 
-#if 0
-static void generic_compute_matrix(
+static void generic_compute_matrix_iterative_astar(
     RouterDelayProfiler& route_profiler,
     vtr::Matrix<std::vector<float>>& matrix,
     int source_x,
@@ -533,6 +543,8 @@ static void generic_compute_matrix(
     const t_router_opts& router_opts,
     bool measure_directconnect,
     const std::set<std::string>& allowed_types) {
+    //vtr::ScopedStartFinishTimer t(vtr::string_fmt("Profiling from (%d,%d)", source_x, source_y));
+
     int delta_x, delta_y;
     int sink_x, sink_y;
 
@@ -555,26 +567,26 @@ static void generic_compute_matrix(
                 if (matrix[delta_x][delta_y].empty()) {
                     //Only set empty target if we don't already have a valid delta delay
                     matrix[delta_x][delta_y].push_back(EMPTY_DELTA);
-#    ifdef VERBOSE
+#ifdef VERBOSE
                     VTR_LOG("Computed delay: %12s delta: %d,%d (src: %d,%d sink: %d,%d)\n",
                             "EMPTY",
                             delta_x, delta_y,
                             source_x, source_y,
                             sink_x, sink_y);
-#    endif
+#endif
                 }
             } else {
                 //Valid start/end
 
                 float delay = route_connection_delay(route_profiler, source_x, source_y, sink_x, sink_y, router_opts, measure_directconnect);
 
-#    ifdef VERBOSE
+#ifdef VERBOSE
                 VTR_LOG("Computed delay: %12g delta: %d,%d (src: %d,%d sink: %d,%d)\n",
                         delay,
                         delta_x, delta_y,
                         source_x, source_y,
                         sink_x, sink_y);
-#    endif
+#endif
                 if (matrix[delta_x][delta_y].size() == 1 && matrix[delta_x][delta_y][0] == EMPTY_DELTA) {
                     //Overwrite empty delta
                     matrix[delta_x][delta_y][0] = delay;
@@ -586,7 +598,6 @@ static void generic_compute_matrix(
         }
     }
 }
-#endif
 
 static vtr::Matrix<float> compute_delta_delays(
     RouterDelayProfiler& route_profiler,
@@ -673,15 +684,27 @@ static vtr::Matrix<float> compute_delta_delays(
     }
     VTR_ASSERT(src_type != nullptr);
 
+    t_compute_delta_delay_matrix generic_compute_matrix;
+    switch (placer_opts.place_delta_delay_matrix_calculation_method) {
+        case e_place_delta_delay_algorithm::ASTAR_ROUTE:
+            generic_compute_matrix = generic_compute_matrix_iterative_astar;
+            break;
+        case e_place_delta_delay_algorithm::DIJKSTRA_EXPANSION:
+            generic_compute_matrix = generic_compute_matrix_dijkstra_expansion;
+            break;
+        default:
+            VPR_FATAL_ERROR(VPR_ERROR_PLACE, "Unknown place_delta_delay_matrix_calculation_method %d", placer_opts.place_delta_delay_matrix_calculation_method);
+    }
+
 #ifdef VERBOSE
     VTR_LOG("Computing from lower left edge (%d,%d):\n", x, y);
 #endif
-    generic_compute_matrix_expand(route_profiler, sampled_delta_delays,
-                                  x, y,
-                                  x, y,
-                                  grid.width() - 1, grid.height() - 1,
-                                  router_opts,
-                                  measure_directconnect, allowed_types);
+    generic_compute_matrix(route_profiler, sampled_delta_delays,
+                           x, y,
+                           x, y,
+                           grid.width() - 1, grid.height() - 1,
+                           router_opts,
+                           measure_directconnect, allowed_types);
 
     //Find the lowest x location on the bottom edge with a non-empty block
     src_type = nullptr;
@@ -705,60 +728,60 @@ static vtr::Matrix<float> compute_delta_delays(
 #ifdef VERBOSE
     VTR_LOG("Computing from left bottom edge (%d,%d):\n", x, y);
 #endif
-    generic_compute_matrix_expand(route_profiler, sampled_delta_delays,
-                                  x, y,
-                                  x, y,
-                                  grid.width() - 1, grid.height() - 1,
-                                  router_opts,
-                                  measure_directconnect, allowed_types);
+    generic_compute_matrix(route_profiler, sampled_delta_delays,
+                           x, y,
+                           x, y,
+                           grid.width() - 1, grid.height() - 1,
+                           router_opts,
+                           measure_directconnect, allowed_types);
 
     //Since the other delta delay values may have suffered from edge effects,
     //we recalculate deltas within regions B, C, E, F
 #ifdef VERBOSE
     VTR_LOG("Computing from low/low:\n");
 #endif
-    generic_compute_matrix_expand(route_profiler, sampled_delta_delays,
-                                  low_x, low_y,
-                                  low_x, low_y,
-                                  grid.width() - 1, grid.height() - 1,
-                                  router_opts,
-                                  measure_directconnect, allowed_types);
+    generic_compute_matrix(route_profiler, sampled_delta_delays,
+                           low_x, low_y,
+                           low_x, low_y,
+                           grid.width() - 1, grid.height() - 1,
+                           router_opts,
+                           measure_directconnect, allowed_types);
 
     //Since the other delta delay values may have suffered from edge effects,
     //we recalculate deltas within regions D, E, G, H
 #ifdef VERBOSE
     VTR_LOG("Computing from high/high:\n");
 #endif
-    generic_compute_matrix_expand(route_profiler, sampled_delta_delays,
-                                  high_x, high_y,
-                                  0, 0,
-                                  high_x, high_y,
-                                  router_opts,
-                                  measure_directconnect, allowed_types);
+    generic_compute_matrix(route_profiler, sampled_delta_delays,
+                           high_x, high_y,
+                           0, 0,
+                           high_x, high_y,
+                           router_opts,
+                           measure_directconnect, allowed_types);
 
     //Since the other delta delay values may have suffered from edge effects,
     //we recalculate deltas within regions A, B, D, E
 #ifdef VERBOSE
     VTR_LOG("Computing from high/low:\n");
 #endif
-    generic_compute_matrix_expand(route_profiler, sampled_delta_delays,
-                                  high_x, low_y,
-                                  0, low_y,
-                                  high_x, grid.height() - 1,
-                                  router_opts,
-                                  measure_directconnect, allowed_types);
+    generic_compute_matrix(route_profiler, sampled_delta_delays,
+                           high_x, low_y,
+                           0, low_y,
+                           high_x, grid.height() - 1,
+                           router_opts,
+                           measure_directconnect, allowed_types);
 
     //Since the other delta delay values may have suffered from edge effects,
     //we recalculate deltas within regions E, F, H, I
 #ifdef VERBOSE
     VTR_LOG("Computing from low/high:\n");
 #endif
-    generic_compute_matrix_expand(route_profiler, sampled_delta_delays,
-                                  low_x, high_y,
-                                  low_x, 0,
-                                  grid.width() - 1, high_y,
-                                  router_opts,
-                                  measure_directconnect, allowed_types);
+    generic_compute_matrix(route_profiler, sampled_delta_delays,
+                           low_x, high_y,
+                           low_x, 0,
+                           grid.width() - 1, high_y,
+                           router_opts,
+                           measure_directconnect, allowed_types);
 
     vtr::Matrix<float> delta_delays({grid.width(), grid.height()});
     for (size_t dx = 0; dx < sampled_delta_delays.dim_size(0); ++dx) {

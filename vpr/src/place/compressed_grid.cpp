@@ -23,8 +23,30 @@ std::vector<t_compressed_block_grid> create_compressed_block_grids() {
     }
 
     std::vector<t_compressed_block_grid> compressed_type_grids(device_ctx.logical_block_types.size());
-    for (const auto& type : device_ctx.logical_block_types) {
-        compressed_type_grids[type.index] = create_compressed_block_grid(block_locations[type.index]);
+    for (const auto& logical_block : device_ctx.logical_block_types) {
+        auto compressed_block_grid = create_compressed_block_grid(block_locations[logical_block.index]);
+
+        for (const auto& physical_tile : logical_block.equivalent_tiles) {
+            std::vector<int> compatible_sub_tiles;
+
+            // Build a vector to store all the sub tile indices that are compatible with the
+            // (physical_tile, logical_block) pair.
+            //
+            // Given that a logical block can potentially be compatible with only a subset of the
+            // sub tiles of a physical tile, we need to ensure which sub tile locations are part of
+            // this subset.
+            for (int isub_tile = 0; isub_tile < physical_tile->capacity; isub_tile++) {
+                if (is_sub_tile_compatible(physical_tile, &logical_block, isub_tile)) {
+                    compatible_sub_tiles.push_back(isub_tile);
+                }
+            }
+
+            // For each of physical tiles compatible with the current logical block, create add an entry
+            // to the compatible sub tiles map with the physical tile index and the above generated vector.
+            compressed_block_grid.compatible_sub_tiles_for_tile.insert({physical_tile->index, compatible_sub_tiles});
+        }
+
+        compressed_type_grids[logical_block.index] = compressed_block_grid;
     }
 
     return compressed_type_grids;

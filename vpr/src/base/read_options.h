@@ -44,6 +44,7 @@ struct t_options {
     argparse::ArgValue<bool> show_graphics; //Enable argparse::ArgValue<int>eractive graphics?
     argparse::ArgValue<int> GraphPause;
     argparse::ArgValue<bool> save_graphics;
+    argparse::ArgValue<std::string> graphics_commands;
 
     /* General options */
     argparse::ArgValue<bool> show_help;
@@ -101,6 +102,9 @@ struct t_options {
     argparse::ArgValue<int> PlaceChanWidth;
     argparse::ArgValue<float> place_rlim_escape_fraction;
     argparse::ArgValue<std::string> place_move_stats_file;
+    argparse::ArgValue<int> placement_saves_per_temperature;
+    argparse::ArgValue<e_place_effort_scaling> place_effort_scaling;
+    argparse::ArgValue<e_place_delta_delay_algorithm> place_delta_delay_matrix_calculation_method;
 
     /* Timing-driven placement options only */
     argparse::ArgValue<float> PlaceTimingTradeoff;
@@ -135,6 +139,7 @@ struct t_options {
     argparse::ArgValue<e_router_algorithm> RouterAlgorithm;
     argparse::ArgValue<int> min_incremental_reroute_fanout;
     argparse::ArgValue<bool> read_rr_edge_metadata;
+    argparse::ArgValue<bool> exit_after_first_routing_iteration;
     argparse::ArgValue<bool> disable_check_route;
     argparse::ArgValue<bool> quick_check_route;
 

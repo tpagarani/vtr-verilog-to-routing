@@ -31,6 +31,7 @@
 #include "place_delay_model.h"
 #include "move_transactions.h"
 #include "move_utils.h"
+#include "read_place.h"
 
 #include "uniform_move_generator.h"
 
@@ -377,6 +378,7 @@ static void outer_loop_recompute_criticalities(const t_placer_opts& placer_opts,
                                                SetupTimingInfo& timing_info);
 
 static void placement_inner_loop(float t,
+                                 int temp_num,
                                  float rlim,
                                  const t_placer_opts& placer_opts,
                                  int move_lim,
@@ -430,8 +432,8 @@ void try_place(const t_placer_opts& placer_opts,
      * width should be taken to when calculating costs.  This allows a       *
      * greater bias for anisotropic architectures.                           */
 
-    int tot_iter, move_lim, moves_since_cost_recompute, width_fac, num_connections,
-        outer_crit_iter_count, inner_recompute_limit;
+    int tot_iter, move_lim = 0, moves_since_cost_recompute, width_fac, num_connections,
+                  outer_crit_iter_count, inner_recompute_limit;
     float t, success_rat, rlim,
         oldt = 0, crit_exponent,
         first_rlim, final_rlim, inverse_delta_rlim;
@@ -586,14 +588,36 @@ void try_place(const t_placer_opts& placer_opts,
     VTR_LOG("Placement contains %zu placement macros involving %zu blocks (average macro size %f)\n", g_vpr_ctx.placement().pl_macros.size(), num_macro_members, float(num_macro_members) / g_vpr_ctx.placement().pl_macros.size());
     VTR_LOG("\n");
 
-    //Table header
-    print_place_status_header();
-
     sprintf(msg, "Initial Placement.  Cost: %g  BB Cost: %g  TD Cost %g \t Channel Factor: %d",
             costs.cost, costs.bb_cost, costs.timing_cost, width_fac);
     //Draw the initial placement
     update_screen(ScreenUpdatePriority::MAJOR, msg, PLACEMENT, timing_info);
-    move_lim = (int)(annealing_sched.inner_num * pow(cluster_ctx.clb_nlist.blocks().size(), 1.3333));
+
+    if (placer_opts.placement_saves_per_temperature >= 1) {
+        std::string filename = vtr::string_fmt("placement_%03d_%03d.place", 0, 0);
+        VTR_LOG("Saving initial placement to file: %s\n", filename.c_str());
+        print_place(nullptr, nullptr, filename.c_str());
+    }
+
+    if (placer_opts.effort_scaling == e_place_effort_scaling::CIRCUIT) {
+        //This scales the move limit proportional to num_blocks ^ (4/3)
+        move_lim = (int)(annealing_sched.inner_num * pow(cluster_ctx.clb_nlist.blocks().size(), 1.3333));
+    } else if (placer_opts.effort_scaling == e_place_effort_scaling::DEVICE_CIRCUIT) {
+        //This scales the move limit proportional to device_size ^ (2/3) * num_blocks ^ (2/3)
+        //
+        //For highly utilized devices (device_size ~ num_blocks) this is the same as
+        //num_blocks ^ (4/3).
+        //
+        //For low utilization devices (device_size >> num_blocks) this performs more
+        //moves (device_size ^ (2/3)) to ensure better optimization. In this case,
+        //more moves than num_blocks ^ (4/3) may be required, since the search space
+        //is larger.
+        float device_size = device_ctx.grid.width() * device_ctx.grid.height();
+        move_lim = (int)(annealing_sched.inner_num * pow(device_size, 2. / 3.) * pow(cluster_ctx.clb_nlist.blocks().size(), 2. / 3.));
+    } else {
+        VPR_ERROR(VPR_ERROR_PLACE, "Unrecognized placer effort scaling");
+    }
+    VTR_LOG("Moves per temperature: %d\n", move_lim);
 
     /* Sometimes I want to run the router with a random placement.  Avoid *
      * using 0 moves to stop division by 0 and 0 length vector problems,  *
@@ -631,6 +655,10 @@ void try_place(const t_placer_opts& placer_opts,
     moves_since_cost_recompute = 0;
     int num_temps = 0;
 
+    //Table header
+    VTR_LOG("\n");
+    print_place_status_header();
+
     /* Outer loop of the simmulated annealing begins */
     while (exit_crit(t, costs.cost, annealing_sched) == 0) {
         if (placer_opts.place_algorithm == PATH_TIMING_DRIVEN_PLACE) {
@@ -645,7 +673,7 @@ void try_place(const t_placer_opts& placer_opts,
                                            place_delay_model.get(),
                                            *timing_info);
 
-        placement_inner_loop(t, rlim, placer_opts,
+        placement_inner_loop(t, num_temps, rlim, placer_opts,
                              move_lim, crit_exponent, inner_recompute_limit, &stats,
                              &costs,
                              &prev_inverse_costs,
@@ -707,7 +735,7 @@ void try_place(const t_placer_opts& placer_opts,
 
     /* Run inner loop again with temperature = 0 so as to accept only swaps
      * which reduce the cost of the placement */
-    placement_inner_loop(t, rlim, placer_opts,
+    placement_inner_loop(t, num_temps, rlim, placer_opts,
                          move_lim, crit_exponent, inner_recompute_limit, &stats,
                          &costs,
                          &prev_inverse_costs,
@@ -732,6 +760,12 @@ void try_place(const t_placer_opts& placer_opts,
     print_place_status(t, oldt, stats,
                        critical_path.delay(), sTNS, sWNS,
                        success_rat, std_dev, rlim, crit_exponent, tot_iter);
+
+    if (placer_opts.placement_saves_per_temperature >= 1) {
+        std::string filename = vtr::string_fmt("placement_%03d_%03d.place", num_temps + 1, 0);
+        VTR_LOG("Saving final placement to file: %s\n", filename.c_str());
+        print_place(nullptr, nullptr, filename.c_str());
+    }
 
     // TODO:
     // 1. add some subroutine hierarchy!  Too big!
@@ -873,6 +907,7 @@ static void outer_loop_recompute_criticalities(const t_placer_opts& placer_opts,
 
 /* Function which contains the inner loop of the simulated annealing */
 static void placement_inner_loop(float t,
+                                 int temp_num,
                                  float rlim,
                                  const t_placer_opts& placer_opts,
                                  int move_lim,
@@ -888,6 +923,8 @@ static void placement_inner_loop(float t,
                                  t_pl_blocks_to_be_moved& blocks_affected,
                                  SetupTimingInfo& timing_info) {
     int inner_crit_iter_count, inner_iter;
+
+    int inner_placement_save_count = 0; //How many times have we dumped placement to a file this temperature?
 
     stats->av_cost = 0.;
     stats->av_bb_cost = 0.;
@@ -960,6 +997,15 @@ static void placement_inner_loop(float t,
         if (*moves_since_cost_recompute > MAX_MOVES_BEFORE_RECOMPUTE) {
             recompute_costs_from_scratch(placer_opts, delay_model, costs);
             *moves_since_cost_recompute = 0;
+        }
+
+        if (placer_opts.placement_saves_per_temperature >= 1
+            && inner_iter > 0
+            && (inner_iter + 1) % (move_lim / placer_opts.placement_saves_per_temperature) == 0) {
+            std::string filename = vtr::string_fmt("placement_%03d_%03d.place", temp_num + 1, inner_placement_save_count);
+            VTR_LOG("Saving placement to file at temperature move %d / %d: %s\n", inner_iter, move_lim, filename.c_str());
+            print_place(nullptr, nullptr, filename.c_str());
+            ++inner_placement_save_count;
         }
     }
     /* Inner loop ends */
@@ -2409,14 +2455,19 @@ static int check_block_placement_consistency() {
                 if (EMPTY_BLOCK_ID == bnum || INVALID_BLOCK_ID == bnum)
                     continue;
 
-                if (physical_tile_type(bnum) != device_ctx.grid[i][j].type) {
+                auto logical_block = cluster_ctx.clb_nlist.block_type(bnum);
+                auto physical_tile = device_ctx.grid[i][j].type;
+
+                if (physical_tile_type(bnum) != physical_tile) {
                     VTR_LOG_ERROR("Block %zu type (%s) does not match grid location (%zu,%zu) type (%s).\n",
-                                  size_t(bnum), cluster_ctx.clb_nlist.block_type(bnum)->name, i, j, device_ctx.grid[i][j].type->name);
+                                  size_t(bnum), logical_block->name, i, j, physical_tile->name);
                     error++;
                 }
-                if ((place_ctx.block_locs[bnum].loc.x != int(i)) || (place_ctx.block_locs[bnum].loc.y != int(j))) {
+
+                auto& loc = place_ctx.block_locs[bnum].loc;
+                if (loc.x != int(i) || loc.y != int(j) || !is_sub_tile_compatible(physical_tile, logical_block, loc.sub_tile)) {
                     VTR_LOG_ERROR("Block %zu's location is (%d,%d,%d) but found in grid at (%zu,%zu,%d).\n",
-                                  size_t(bnum), place_ctx.block_locs[bnum].loc.x, place_ctx.block_locs[bnum].loc.y, place_ctx.block_locs[bnum].loc.sub_tile,
+                                  size_t(bnum), loc.x, loc.y, loc.sub_tile,
                                   i, j, k);
                     error++;
                 }
