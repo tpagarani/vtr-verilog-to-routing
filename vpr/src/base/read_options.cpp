@@ -692,6 +692,8 @@ struct ParseRouterLookahead {
             conv_value.set_value(e_router_lookahead::CLASSIC);
         else if (str == "map")
             conv_value.set_value(e_router_lookahead::MAP);
+        else if (str == "connection_box_map")
+            conv_value.set_value(e_router_lookahead::CONNECTION_BOX_MAP);
         else {
             std::stringstream msg;
             msg << "Invalid conversion from '"
@@ -705,17 +707,22 @@ struct ParseRouterLookahead {
 
     ConvertedValue<std::string> to_str(e_router_lookahead val) {
         ConvertedValue<std::string> conv_value;
-        if (val == e_router_lookahead::CLASSIC)
+        if (val == e_router_lookahead::CLASSIC) {
             conv_value.set_value("classic");
-        else {
-            VTR_ASSERT(val == e_router_lookahead::MAP);
+        } else if (val == e_router_lookahead::MAP) {
             conv_value.set_value("map");
+        } else if (val == e_router_lookahead::CONNECTION_BOX_MAP) {
+            conv_value.set_value("connection_box_map");
+        } else {
+            std::stringstream msg;
+            msg << "Unrecognized e_router_lookahead";
+            conv_value.set_error(msg.str());
         }
         return conv_value;
     }
 
     std::vector<std::string> default_choices() {
-        return {"classic", "map"};
+        return {"classic", "map", "connection_box_map"};
     }
 };
 
@@ -1884,6 +1891,16 @@ argparse::ArgumentParser create_arg_parser(std::string prog_name, t_options& arg
 
     route_timing_grp.add_argument<bool, ParseOnOff>(args.read_rr_edge_metadata, "--read_rr_edge_metadata")
         .help("Read RR edge metadata from --read_rr_graph.  RR edge metadata is not used in core VPR algorithms, and is typically not read to save runtime and memory. (Default: off).")
+        .default_value("off")
+        .show_in(argparse::ShowIn::HELP_ONLY);
+
+    route_timing_grp.add_argument<bool, ParseOnOff>(args.disable_check_route, "--disable_check_route")
+        .help("Disables check_route once routing step has finished or when routing file is loaded")
+        .default_value("off")
+        .show_in(argparse::ShowIn::HELP_ONLY);
+
+    route_timing_grp.add_argument<bool, ParseOnOff>(args.quick_check_route, "--quick_check_route")
+        .help("Runs check_route, disabling slow checks, once routing step has finished or when routing file is loaded")
         .default_value("off")
         .show_in(argparse::ShowIn::HELP_ONLY);
 
