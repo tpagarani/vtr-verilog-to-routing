@@ -32,7 +32,6 @@
 #include "rr_graph_writer.h"
 #include "rr_graph_reader.h"
 #include "router_lookahead_map.h"
-#include "connection_box_lookahead_map.h"
 #include "rr_graph_clock.h"
 
 #include "rr_types.h"
@@ -885,7 +884,6 @@ void load_rr_switch_from_arch_switch(int arch_switch_idx,
     device_ctx.rr_switch_inf[rr_switch_idx].Cin = device_ctx.arch_switch_inf[arch_switch_idx].Cin;
     device_ctx.rr_switch_inf[rr_switch_idx].Cinternal = device_ctx.arch_switch_inf[arch_switch_idx].Cinternal;
     device_ctx.rr_switch_inf[rr_switch_idx].Cout = device_ctx.arch_switch_inf[arch_switch_idx].Cout;
-    device_ctx.rr_switch_inf[rr_switch_idx].penalty_cost = device_ctx.arch_switch_inf[arch_switch_idx].penalty_cost;
     device_ctx.rr_switch_inf[rr_switch_idx].Tdel = rr_switch_Tdel;
     device_ctx.rr_switch_inf[rr_switch_idx].mux_trans_size = device_ctx.arch_switch_inf[arch_switch_idx].mux_trans_size;
     if (device_ctx.arch_switch_inf[arch_switch_idx].buf_size_type == BufferSize::AUTO) {
@@ -1487,7 +1485,7 @@ static void build_rr_sinks_sources(const int i,
                             inode = get_rr_node_index(L_rr_node_indices, i + width_offset, j + height_offset, OPIN, ipin, side);
 
                             //Initially left unconnected
-
+                            VTR_ASSERT(inode >= 0);
                             L_rr_node[inode].set_cost_index(OPIN_COST_INDEX);
                             L_rr_node[inode].set_type(OPIN);
                         }

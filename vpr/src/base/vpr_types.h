@@ -108,10 +108,7 @@ constexpr const char* EMPTY_BLOCK_NAME = "EMPTY";
 enum class e_router_lookahead {
     CLASSIC, //VPR's classic lookahead (assumes uniform wire types)
     MAP,     //Lookahead considering different wire types (see Oleg Petelin's MASc Thesis)
-    NO_OP,   //A no-operation lookahead which always returns zero
-    CONNECTION_BOX_MAP,
-    // Lookahead considering different wire types and IPIN
-    // connection box.
+    NO_OP    //A no-operation lookahead which always returns zero
 };
 
 enum class e_route_bb_update {
@@ -1002,8 +999,6 @@ struct t_router_opts {
 
     e_heap_type router_heap;
     bool exit_after_first_routing_iteration;
-    bool disable_check_route;
-    bool quick_check_route;
 };
 
 struct t_analysis_opts {

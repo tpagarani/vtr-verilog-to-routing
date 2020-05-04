@@ -630,10 +630,10 @@ struct t_physical_tile_type {
     // https://github.com/verilog-to-routing/vtr-verilog-to-routing/issues/1193
 
     // Does this t_physical_tile_type contain an inpad?
-    bool is_input_type;
+    bool is_input_type = false;
 
     // Does this t_physical_tile_type contain an outpad?
-    bool is_output_type;
+    bool is_output_type = false;
 };
 
 /* Holds the capacity range of a certain sub_tile block within the parent physical tile type.
@@ -1440,7 +1440,6 @@ struct t_arch_switch_inf {
     float Cin = 0.;
     float Cout = 0.;
     float Cinternal = 0.;
-    float penalty_cost = 0.;
     float mux_trans_size = 1.;
     BufferSize buf_size_type = BufferSize::AUTO;
     float buf_size = 0.;
@@ -1505,7 +1504,6 @@ struct t_rr_switch_inf {
     float Cout = 0.;
     float Cinternal = 0.;
     float Tdel = 0.;
-    float penalty_cost = 0.;
     float mux_trans_size = 0.;
     float buf_size = 0.;
     const char* name = nullptr;
