@@ -142,6 +142,12 @@ enum class e_balance_block_type_util {
     AUTO
 };
 
+enum class e_check_route_option {
+    OFF,
+    QUICK,
+    FULL
+};
+
 /* Selection algorithm for selecting next seed  */
 enum class e_cluster_seed {
     TIMING,
@@ -1002,8 +1008,8 @@ struct t_router_opts {
 
     e_heap_type router_heap;
     bool exit_after_first_routing_iteration;
-    bool disable_check_route;
-    bool quick_check_route;
+
+    e_check_route_option check_route;
 };
 
 struct t_analysis_opts {
