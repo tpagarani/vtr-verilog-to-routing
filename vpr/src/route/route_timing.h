@@ -13,14 +13,12 @@
 #include "connection_router_interface.h"
 #include "heap_type.h"
 
-extern bool f_router_debug;
-
 int get_max_pins_per_net();
 
 bool try_timing_driven_route(const t_router_opts& router_opts,
                              const t_analysis_opts& analysis_opts,
                              const std::vector<t_segment_inf>& segment_inf,
-                             vtr::vector<ClusterNetId, float*>& net_delay,
+                             ClbNetPinsMatrix<float>& net_delay,
                              const ClusteredPinAtomPinsLookup& netlist_pin_lookup,
                              std::shared_ptr<SetupHoldTimingInfo> timing_info,
                              std::shared_ptr<RoutingDelayCalculator> delay_calc,
@@ -36,7 +34,7 @@ bool try_timing_driven_route_net(ConnectionRouter& router,
                                  RouterStats& connections_routed,
                                  float* pin_criticality,
                                  t_rt_node** rt_node_of_sink,
-                                 vtr::vector<ClusterNetId, float*>& net_delay,
+                                 ClbNetPinsMatrix<float>& net_delay,
                                  const ClusteredPinAtomPinsLookup& netlist_pin_lookup,
                                  std::shared_ptr<SetupTimingInfo> timing_info,
                                  route_budgets& budgeting_inf,

@@ -619,7 +619,7 @@ struct t_physical_tile_type {
 
     /* Unordered map indexed by the logical block index.
      * tile_block_pin_directs_map[logical block index][logical block pin] -> physical tile pin */
-    std::unordered_map<int, vtr::bimap<t_logical_pin, t_physical_pin>> tile_block_pin_directs_map;
+    std::unordered_map<int, std::unordered_map<int, vtr::bimap<t_logical_pin, t_physical_pin>>> tile_block_pin_directs_map;
 
     /* Returns the indices of pins that contain a clock for this physical logic block */
     std::vector<int> get_clock_pins_indices() const;
@@ -690,11 +690,9 @@ struct t_sub_tile {
  */
 struct t_logical_pin {
     int pin = -1;
-    int sub_tile_index = -1;
 
-    t_logical_pin(int index, int value) {
+    t_logical_pin(int value) {
         pin = value;
-        sub_tile_index = index;
     }
 
     bool operator==(const t_logical_pin o) const {
@@ -1440,7 +1438,6 @@ struct t_arch_switch_inf {
     float Cin = 0.;
     float Cout = 0.;
     float Cinternal = 0.;
-    float penalty_cost = 0.;
     float mux_trans_size = 1.;
     BufferSize buf_size_type = BufferSize::AUTO;
     float buf_size = 0.;
@@ -1505,7 +1502,6 @@ struct t_rr_switch_inf {
     float Cout = 0.;
     float Cinternal = 0.;
     float Tdel = 0.;
-    float penalty_cost = 0.;
     float mux_trans_size = 0.;
     float buf_size = 0.;
     const char* name = nullptr;
